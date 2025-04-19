@@ -16,8 +16,8 @@ CurrentModerator = Depends(get_current_moderator)
 
 @router.post("/", response_model=GetAuditorium, status_code=201)
 async def route_create_auditorium(
-    auditorium_data: CreateAuditorium, # Данные из тела
-    current_user: User = CurrentModerator # Только модератор
+    auditorium_data: CreateAuditorium,
+    current_user: User = CurrentModerator
 ):
     return await create_auditorium(auditorium_data)
 
@@ -37,7 +37,7 @@ async def route_get_auditoriums():
 
 @router.patch("/{auditorium_uuid}", response_model=GetAuditorium, status_code=200)
 async def route_update_auditorium(
-    update_data: UpdateAuditorium, # Данные из тела
+    update_data: UpdateAuditorium,
     auditorium_uuid: UUID4 = Path(..., title="UUID of the auditorium to update"),
     current_user: User = CurrentModerator
 ):
@@ -96,14 +96,13 @@ async def route_get_auditoriums(
         None,
         alias="minCapacity",
         description="Минимальная требуемая вместимость аудитории",
-        ge=1 # Вместимость должна быть > 0
+        ge=1
     ),
     equipment_id: Optional[UUID4] = Query(
         None,
         alias="equipmentId",
         description="UUID оборудования, которое должно присутствовать в аудитории"
     )
-    # current_user: User = Depends(get_current_user) # Аутентификация не обязательна для просмотра
 ):
     """
     Возвращает список аудиторий.
@@ -111,10 +110,8 @@ async def route_get_auditoriums(
     и наличию конкретного оборудования (equipmentId).
     Доступно всем.
     """
-    # Передаем новые параметры в сервисную функцию
     auditoriums = await get_auditoriums(
         min_capacity=min_capacity,
         equipment_id=equipment_id
     )
-    # Сервис должен выполнить prefetch_related('equipment'), чтобы схема GetAuditorium заполнилась
     return auditoriums

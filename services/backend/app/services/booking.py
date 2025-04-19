@@ -11,7 +11,6 @@ from app.enums import UserRole
 from pydantic import UUID4
 
 from app.utils.contrib import get_current_user
-from app.routes.booking import get_my_bookings
 
 
 async def check_auditorium_availability(
@@ -28,14 +27,12 @@ async def check_auditorium_availability(
     while current_check_dt < end_dt:
         current_date = current_check_dt.date()
         day_of_week = current_date.weekday()
-        segment_end_for_date = builtin_min(end_dt, datetime.combine(current_date + timedelta(days=1), time(0, 0, 0), tzinfo=start_dt.tzinfo))
+        next_day_start = datetime.combine(current_date + timedelta(days=1), time(0, 0, 0), tzinfo=start_dt.tzinfo)
+        segment_end_for_date = min(end_dt, next_day_start)
         check_start_time = current_check_dt.time()
-        # ---> FIX: Use datetime.time explicitly <---
         check_end_time = segment_end_for_date.time() if segment_end_for_date.date() == current_date else datetime.time(23, 59, 59, 999999)
 
-        # ---> FIX: Use datetime.time explicitly <---
         if segment_end_for_date.time() == datetime.time(0, 0) and segment_end_for_date > current_check_dt:
-        # Around line 37 (assignment inside if)
             check_end_time = datetime.time(23, 59, 59, 999999)
 
         if day_of_week not in availability_slots_cache:
@@ -57,31 +54,22 @@ async def check_auditorium_availability(
         time_covered_until = check_start_time
         segment_fully_covered = False
 
-        # ---> FIX: Use datetime.time explicitly <---
         if check_start_time == check_end_time and check_start_time == datetime.time(0, 0):
              segment_fully_covered = True
         else:
             sorted_slots = sorted(slots_for_day, key=lambda s: s.start_time)
             for slot in sorted_slots:
-                # ---> FIX: Use datetime.time explicitly <---
                 effective_slot_end = slot.end_time if slot.end_time != datetime.time(0, 0) else datetime.time(23, 59, 59, 999999)
 
-                # --- Minor logic refinement suggestion ---
-                # Check if the current slot can even cover the start time needed
                 if slot.start_time <= time_covered_until and effective_slot_end > time_covered_until:
-                    # If the slot starts before or at the time we need coverage for,
-                    # and ends after it, it extends our coverage.
                     time_covered_until = max(time_covered_until, effective_slot_end)
 
-                # Optimization: If the next slot starts after the required end time, we can't be covered.
-                # (This assumes sorted_slots)
                 if slot.start_time > check_end_time:
-                    break # Gaps cannot be filled by later slots
+                    break
 
                 if time_covered_until >= check_end_time:
                     segment_fully_covered = True
                     break
-            # --- End refinement suggestion ---
 
         if not segment_fully_covered:
             auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
@@ -90,7 +78,6 @@ async def check_auditorium_availability(
                 status_code=400,
                 detail=(f"Аудитория '{identifier}' недоступна в запрошенный временной интервал. "
                         f"Проблема в {current_date.strftime('%A, %Y-%m-%d')} "
-                        # Show the segment that failed coverage
                         f"между {check_start_time.strftime('%H:%M:%S')} и {check_end_time.strftime('%H:%M:%S')}. "
                         f"Проверьте расписание доступности.")
             )
@@ -100,14 +87,13 @@ async def check_auditorium_availability(
     return True
 
 
-async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Optional[Booking]: # Возвращаем модель
+async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Optional[Booking]:
     """ Получает бронирование по UUID с проверкой прав """
     booking = await Booking.filter(uuid=booking_uuid).prefetch_related('broker', 'auditorium').first()
 
     if not booking:
         return None
 
-    # --- Проверка прав доступа ---
     if booking.broker_id != current_user.uuid and current_user.role != UserRole.MODERATOR:
         raise HTTPException(
             status_code=403,
@@ -146,7 +132,7 @@ async def check_booking_overlap(
     return True
 
 
-async def create_booking(booking_model: CreateBooking, current_user: User) -> Booking: # Возвращаем модель
+async def create_booking(booking_model: CreateBooking, current_user: User) -> Booking:
     """ Создает новое бронирование """
     auditorium = await Auditorium.get_or_none(uuid=booking_model.auditorium)
     if not auditorium:
@@ -157,16 +143,12 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Bo
 
     start = booking_model.start_time
     end = booking_model.end_time
-    # Убедимся что TZ info консистентно (если используется)
-    # ... (логика обработки TZ)
 
     await check_auditorium_availability(auditorium_uuid=booking_model.auditorium, start_dt=start, end_dt=end)
     await check_booking_overlap(auditorium_uuid=booking_model.auditorium, start=start, end=end)
 
     try:
-        # Создаем объект Booking, UUID генерируется Tortoise
         new_booking = Booking(
-            # uuid=uuid.uuid4(), # Генерируем UUID здесь, если Tortoise не настроен на автогенерацию PK
             auditorium=auditorium,
             broker=current_user,
             start_time=start,
@@ -174,11 +156,11 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Bo
             title=booking_model.title
         )
         await new_booking.save()
-        await new_booking.fetch_related('broker', 'auditorium') # Подгружаем для возврата
-        return new_booking # Возвращаем объект модели
+        await new_booking.fetch_related('broker', 'auditorium')
+        return new_booking
     except IntegrityError as e:
         raise HTTPException(
-            status_code=409, # Может быть конфликт UUID если генерируем вручную и не уникально
+            status_code=409,
             detail=f"Ошибка целостности данных при создании бронирования: {e}"
         )
     except Exception as e:
@@ -191,67 +173,55 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Bo
     
 async def update_booking(
     booking_uuid: UUID4,
-    booking_update_data: UpdateBooking, # Используем схему UpdateBooking
+    booking_update_data: UpdateBooking,
     current_user: User
-) -> Booking: # Возвращаем модель
+) -> Booking:
     """ Обновляет существующее бронирование """
-    # Используем стандартный метод Tortoise
     booking = await Booking.filter(uuid=booking_uuid).prefetch_related('broker', 'auditorium').first()
 
     if not booking:
         raise HTTPException(status_code=404, detail="Бронирование не найдено")
 
-    # Проверка прав: пользователь является создателем брони ИЛИ модератором
     if booking.broker_id != current_user.uuid and current_user.role != UserRole.MODERATOR:
         raise HTTPException(
-            status_code=403, # Исправлен статус на 403
+            status_code=403,
             detail="Недостаточно прав для изменения этого бронирования."
         )
 
-    # Используем exclude_unset=True для поддержки PATCH-семантики
     update_data = booking_update_data.model_dump(exclude_unset=True)
 
-    # Определяем финальные значения для проверки и обновления
     final_start_time = update_data.get('start_time', booking.start_time)
     final_end_time = update_data.get('end_time', booking.end_time)
     final_auditorium_uuid = update_data.get('auditorium', booking.auditorium_id)
 
-    # --- Проверки перед обновлением ---
     final_auditorium = booking.auditorium
     if 'auditorium' in update_data and update_data['auditorium'] != booking.auditorium_id:
-        final_auditorium_uuid = update_data['auditorium'] # Берем UUID из данных для обновления
+        final_auditorium_uuid = update_data['auditorium']
         final_auditorium = await Auditorium.get_or_none(uuid=final_auditorium_uuid)
         if not final_auditorium:
             raise HTTPException(
                 status_code=404,
                 detail=f"Новая аудитория с UUID {final_auditorium_uuid} не найдена."
             )
-        # Для обновления через update_from_dict нужно передать auditorium_id
         update_data['auditorium_id'] = final_auditorium.uuid
-        del update_data['auditorium'] # Удаляем ключ 'auditorium', оставляем 'auditorium_id'
+        del update_data['auditorium']
     elif 'auditorium' in update_data:
-         # Если UUID аудитории передан, но он тот же самый, удаляем его из update_data
-         del update_data['auditorium']
+        del update_data['auditorium']
 
 
     await check_auditorium_availability(
-        auditorium_uuid=final_auditorium_uuid, # Используем UUID аудитории
+        auditorium_uuid=final_auditorium_uuid,
         start_dt=final_start_time,
         end_dt=final_end_time
     )
     await check_booking_overlap(
-        auditorium_uuid=final_auditorium_uuid, # Используем UUID аудитории
+        auditorium_uuid=final_auditorium_uuid,
         start=final_start_time,
         end=final_end_time,
         exclude_booking_uuid=booking_uuid
     )
-    # --- Конец проверок ---
-
-    # Применяем изменения к объекту booking
-    # Используем update_from_dict для простоты
     await booking.update_from_dict(update_data).save()
 
-    # Подгружаем связанные объекты снова, т.к. update_from_dict их сбрасывает
     await booking.fetch_related('broker', 'auditorium')
     return booking
 
@@ -261,7 +231,7 @@ async def get_bookings(
     user_uuid: Optional[UUID4] = None,
     start_date: Optional[datetime.date] = None,
     end_date: Optional[datetime.date] = None
-) -> List[Booking]: # Возвращаем список моделей
+) -> List[Booking]:
     """ Получает список бронирований с фильтрацией и проверкой прав """
     query = Booking.all().prefetch_related('broker', 'auditorium')
 
@@ -270,18 +240,16 @@ async def get_bookings(
         if user_uuid is not None and user_uuid != current_user.uuid:
              raise HTTPException(status_code=403, detail="Вы не можете просматривать бронирования других пользователей.")
     elif user_uuid is not None:
-        query = query.filter(broker_id=user_uuid) # Исправлено на _id
+        query = query.filter(broker_id=user_uuid)
 
     if auditorium_uuid:
-        query = query.filter(auditorium_id=auditorium_uuid) # Исправлено на _id
+        query = query.filter(auditorium_id=auditorium_uuid)
 
     if start_date:
         start_datetime = datetime.combine(start_date, datetime.time.min)
-        # Добавить обработку TZ если необходимо
         query = query.filter(start_time__gte=start_datetime)
     if end_date:
         end_datetime = datetime.combine(end_date, datetime.time.max)
-        # Добавить обработку TZ если необходимо
         query = query.filter(end_time__lte=end_datetime)
 
     bookings = await query.order_by('start_time')
@@ -290,7 +258,6 @@ async def get_bookings(
 
 async def delete_booking(booking_uuid: UUID4, current_user: User) -> bool:
     """ Удаляет бронирование по UUID с проверкой прав """
-    # Используем стандартный метод Tortoise
     booking = await Booking.get_or_none(uuid=booking_uuid)
     if not booking:
         return False
@@ -314,28 +281,14 @@ async def get_bookings_for_calendar(
     Получает список бронирований для указанной аудитории в заданном диапазоне дат.
     Возвращает список моделей Booking, готовых для преобразования в CalendarBookingEntry.
     """
-    # Преобразуем даты в datetime для корректного сравнения с полями модели
-    # Включаем весь день для start_date и end_date
     start_dt = datetime.combine(start_date, time.min)
     end_dt = datetime.combine(end_date, time.max)
 
-    # Добавляем обработку часовых поясов, если ваше приложение их использует
-    # Например, если start_dt/end_dt должны быть в UTC:
-    # from app.utils.timezone import make_aware # Пример хелпера
-    # start_dt = make_aware(start_dt)
-    # end_dt = make_aware(end_dt)
-    # Или используйте timezone.utc из datetime, если время хранится в UTC
-
-    # Запрос для поиска бронирований, которые *пересекаются* с заданным диапазоном [start_dt, end_dt]
-    # Условие пересечения: (BookingStart < QueryEnd) AND (BookingEnd > QueryStart)
     query = Booking.filter(
         auditorium_id=auditorium_uuid,
-        start_time__lt=end_dt,  # Бронь начинается до конца запрашиваемого периода
-        end_time__gt=start_dt   # Бронь заканчивается после начала запрашиваемого периода
+        start_time__lt=end_dt,
+        end_time__gt=start_dt
     ).order_by('start_time')
-
-    # Если в схеме CalendarBookingEntry нужно имя пользователя, добавь prefetch:
-    # query = query.prefetch_related('broker')
 
     bookings = await query.all()
     return bookings
@@ -350,25 +303,17 @@ async def get_my_bookings(
     """
     Получает список бронирований ТЕКУЩЕГО пользователя с возможностью фильтрации.
     """
-    # Начинаем запрос, СРАЗУ фильтруя по ID текущего пользователя
     query = Booking.filter(broker_id=current_user.uuid)
 
-    # Применяем опциональные фильтры
     if auditorium_uuid:
         query = query.filter(auditorium_id=auditorium_uuid)
 
-    # Применяем фильтры по датам (аналогично get_bookings)
     if start_date:
         start_datetime = datetime.combine(start_date, datetime.min.time())
-        # Добавить обработку TZ если необходимо
-        query = query.filter(start_time__gte=start_datetime) # Бронирования, начинающиеся не раньше start_date
+        query = query.filter(start_time__gte=start_datetime)
     if end_date:
         end_datetime = datetime.combine(end_date, datetime.max.time())
-        # Добавить обработку TZ если необходимо
-        query = query.filter(end_time__lte=end_datetime) # Бронирования, заканчивающиеся не позже end_date
-        # Альтернативно, если нужна логика пересечения диапазона:
-        # query = query.filter(start_time__lte=end_datetime)
+        query = query.filter(end_time__lte=end_datetime)
 
-    # Предзагрузка связанных данных для схемы GetBooking и сортировка
     bookings = await query.prefetch_related('broker', 'auditorium').order_by('start_time')
     return bookings

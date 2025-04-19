@@ -1,6 +1,7 @@
 import uvicorn 
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -25,13 +26,16 @@ def init_middlewares(app: FastAPI):
 
 
 app = FastAPI()
+instrumentator = Instrumentator().instrument(app)
 
 
 main_app_lifespan = app.router.lifespan_context
 @asynccontextmanager
 async def lifespan_wrapper(app):
     await init(app)
-    # await run_seeding()
+    instrumentator.expose(app)
+    if settings.MODE == "DEBUG":
+        await run_seeding()
     async with main_app_lifespan(app) as maybe_state:
         yield maybe_state
 app.router.lifespan_context = lifespan_wrapper

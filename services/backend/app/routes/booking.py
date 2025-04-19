@@ -34,8 +34,8 @@ async def handle_read_bookings(
     """ Возвращает список бронирований с возможностью фильтрации. """
     bookings_list = await get_bookings(
         current_user=current_user,
-        auditorium_uuid=auditorium_id, # Передаем UUID
-        user_uuid=user_id,           # Передаем UUID
+        auditorium_uuid=auditorium_id,
+        user_uuid=user_id,
         start_date=start_date,
         end_date=end_date
     )
@@ -56,7 +56,7 @@ async def handle_read_booking(
 
 @router.patch("/{booking_uuid}", response_model=GetBooking)
 async def handle_update_booking(
-    booking_update_data: UpdateBooking, # Схема без UUID
+    booking_update_data: UpdateBooking,
     booking_uuid: UUID4 = Path(..., title="UUID бронирования для обновления"),
     current_user: User = Depends(get_current_user)
 ):
@@ -88,8 +88,7 @@ async def handle_delete_booking(
 
 @router.get("/me", response_model=List[GetBooking], summary="Получить мои бронирования")
 async def handle_read_my_bookings(
-    current_user: User = Depends(get_current_user), # Получаем текущего пользователя
-    # Добавляем те же фильтры, что и в основном GET /bookings, КРОМЕ userId
+    current_user: User = Depends(get_current_user),
     auditorium_id: Optional[UUID4] = Query(None, alias="auditoriumId", description="Фильтр по UUID аудитории"),
     start_date: Optional[date] = Query(None, alias="startDate", description="Начальная дата для фильтрации (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, alias="endDate", description="Конечная дата для фильтрации (YYYY-MM-DD)")

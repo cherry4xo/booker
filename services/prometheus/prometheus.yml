@@ -1,0 +1,24 @@
+# prometheus/prometheus.yml
+global:
+  scrape_interval: 15s # Как часто собирать метрики
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus' # Мониторинг самого Prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'auth_service'
+    # Используем DNS Docker Compose для обнаружения сервиса
+    # 'auth' - имя сервиса в docker-compose.yml
+    # '8080' - порт, на котором работает приложение ВНУТРИ контейнера auth
+    static_configs:
+      - targets: ['auth:8080']
+    metrics_path: /metrics # Стандартный путь для prometheus-fastapi-instrumentator
+
+  - job_name: 'backend_service'
+    # 'backend' - имя сервиса в docker-compose.yml
+    # '8080' - порт, на котором работает приложение ВНУТРИ контейнера backend
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: /metrics

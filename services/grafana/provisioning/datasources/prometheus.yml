@@ -1,0 +1,10 @@
+# grafana/provisioning/datasources/prometheus.yml
+apiVersion: 1
+
+datasources:
+  - name: Prometheus   # Имя источника данных в Grafana
+    type: prometheus
+    url: http://prometheus:9090  # URL для доступа к Prometheus из Grafana (используем имя сервиса)
+    access: proxy      # Доступ через Grafana бэкенд
+    isDefault: true    # Сделать этот источник данных по умолчанию
+    editable: true     # Разрешить редактирование в UI Grafana

@@ -51,7 +51,6 @@ async def update_auditorium(auditorium_uuid: UUID4, auditorium_update_data: Upda
 
     update_data = auditorium_update_data.model_dump(exclude_unset=True)
 
-    # Проверка уникальности identifier, если он меняется
     if 'identifier' in update_data and update_data['identifier'] != auditorium.identifier:
         existing = await Auditorium.get_or_none(identifier=update_data['identifier'])
         if existing:

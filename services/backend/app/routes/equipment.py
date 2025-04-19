@@ -33,7 +33,6 @@ async def update_equipment(
         equipment_uuid=equipment_uuid,
         equipment_update=equipment_update
     )
-    # Сервис кидает 404, 409
     return updated_equipment
 
 

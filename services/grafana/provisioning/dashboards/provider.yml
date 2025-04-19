@@ -1,0 +1,12 @@
+# grafana/provisioning/dashboards/provider.yml
+apiVersion: 1
+
+providers:
+- name: 'default'        # Имя провайдера
+  orgId: 1             # ID организации (обычно 1 для основной)
+  folder: ''           # Папка в Grafana (пусто - корневая)
+  type: file           # Тип провайдера - файлы
+  disableDeletion: false # Разрешить удаление дашбордов из UI
+  editable: true       # Разрешить редактирование
+  options:
+    path: /etc/grafana/provisioning/dashboards # Путь к дашбордам ВНУТРИ контейнера Grafana
