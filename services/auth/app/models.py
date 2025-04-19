@@ -56,6 +56,15 @@ class User(TimestampMixin, BaseModel):
             return user
         except DoesNotExist:
             return None
+        
+    @classmethod
+    async def get_by_email(cls, email: str) -> Optional["User"]:
+        try:
+            query = cls.get_or_none(email=email)
+            user = await query
+            return user
+        except DoesNotExist:
+            return None
 
     def __str__(self):
         return f"{self.username} ({self.role.value})"

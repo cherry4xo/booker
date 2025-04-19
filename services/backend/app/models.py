@@ -1,3 +1,5 @@
+
+from datetime import date
 import enum
 from typing import Optional
 from datetime import datetime
@@ -5,6 +7,9 @@ from datetime import datetime
 from tortoise import fields
 from tortoise.models import Model
 from tortoise.exceptions import DoesNotExist
+
+from app.utils import password
+from app.schemas import UserCreate
 
 
 class BaseModel(Model):
@@ -39,6 +44,13 @@ class User(TimestampMixin, BaseModel):
     registration_date = fields.DateField(auto_now_add=True)
     telegram_id = fields.CharField(max_length=255, null=True)
     role = fields.CharEnumField(UserRole, default=UserRole.BOOKER, description="User role")
+
+    @classmethod
+    async def create(cls, user: UserCreate) -> "User":
+        user_dict = user.model_dump(exclude=["password"])
+        password_hash = password.get_password_hash(password=user.password)
+        model = cls(**user_dict, password_hash=password_hash, registration_date=date.today())
+        return model
 
     @classmethod
     async def get_by_username(cls, username: str) -> Optional["User"]:

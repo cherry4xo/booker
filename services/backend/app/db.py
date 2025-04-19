@@ -8,6 +8,8 @@ from aerich import Command, exceptions as aerich_exceptions
 from fastapi import FastAPI
 
 from app import settings
+from app.models import User, UserRole
+from app.schemas import UserCreate
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -38,8 +40,7 @@ def register_db(app: FastAPI, db_url: str = None) -> None:
     app_list = ["app.models", "aerich.models"]
     register_tortoise(
         app,
-        db_url=db_url,
-        modules={"models": app_list},
+        config=TORTOISE_ORM,
         generate_schemas=True,
         add_exception_handlers=True
     )
@@ -87,10 +88,6 @@ async def upgrade_db(app: FastAPI, db_url: str = None):
         logger.info("'aerich upgrade' finished.")
         logger.info("Database migrations applied successfully.")
 
-    except aerich_exceptions.MigrationNotInitialized as e:
-        logger.critical(f"Caught MigrationNotInitialized during upgrade phase, which is unexpected after init: {e}", exc_info=True)
-        raise
-
     except FileNotFoundError as e:
         logger.critical(f"Migration directory check failed: {e}", exc_info=True)
         print(f"FATAL: Missing migration directory: {e}")
@@ -101,7 +98,37 @@ async def upgrade_db(app: FastAPI, db_url: str = None):
         print(f"FATAL: Failed to apply migrations: {e}")
         raise
 
+async def create_default_moderator_user() -> None:
+    if not settings.DEFAULT_MODERATOR_PASSWORD:
+        logger.warning("DEFAULT_MODERATOR_PASSWORD environment variable not set. Cannot create default moderator.")
+        return None
+
+    logger.info(f"Checking for default moderator user: {settings.DEFAULT_MODERATOR_USERNAME}")
+
+    try:
+        existing_user = await User.get_by_username(settings.DEFAULT_MODERATOR_USERNAME)
+        if existing_user:
+            logger.info(f"Default moderator '{settings.DEFAULT_MODERATOR_USERNAME}' already exists.")
+            if existing_user.role != UserRole.MODERATOR:
+                logger.warning(f"User '{settings.DEFAULT_MODERATOR_USERNAME}' exists but is not a MODERATOR. Updating role.")
+                existing_user.role = UserRole.MODERATOR
+                await existing_user.save(update_fields=['role', 'updated_at']) # Explicitly save role change
+            return existing_user
+        else:
+            logger.info(f"Default moderator '{settings.DEFAULT_MODERATOR_USERNAME}' not found. Creating...")
+            user_model = UserCreate(username=settings.DEFAULT_MODERATOR_USERNAME, 
+                                    password=settings.DEFAULT_MODERATOR_PASSWORD, 
+                                    email=settings.DEFAULT_MODERATOR_EMAIL)
+            new_user = await User.create(user_model)
+            new_user.role = UserRole.MODERATOR
+            await new_user.save()
+    except Exception as e:
+        logger.error(f"Failed to create default moderator user: {e}", exc_info=True)
+        raise
+
+
 async def init(app: FastAPI):
     await upgrade_db(app)
     register_db(app)
     logger.debug("Connected to db")
+    await create_default_moderator_user()

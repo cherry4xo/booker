@@ -27,11 +27,9 @@ TORTOISE_ORM = get_tortoise_config()
 
 def register_db(app: FastAPI, db_url: str = None) -> None:
     db_url = db_url or settings.DB_URL
-    app_list = ["app.models", "aerich.models"]
     register_tortoise(
         app,
-        db_url=db_url,
-        modules={"models": app_list},
+        config=TORTOISE_ORM,
         generate_schemas=False,
         add_exception_handlers=True
     )
@@ -42,10 +40,10 @@ async def upgrade_db(app: FastAPI, db_url: str = None):
     if not os.path.exists("./migrations/models"):
         await command.init_db(safe=True)
     await command.init()
-    await command.migrate(str(uuid.uuid4()))
-    await command.upgrade(run_in_transaction=True)
+    # await command.migrate(str(uuid.uuid4()))
+    # await command.upgrade(run_in_transaction=True)
 
 async def init(app: FastAPI):
-    # await upgrade_db(app)
+    await upgrade_db(app)
     register_db(app)
     logger.debug("Connected to db")
