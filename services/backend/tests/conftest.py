@@ -1,12 +1,7 @@
 # services/backend/tests/conftest.py
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from uuid import uuid4
-from app.models import User, UserRole # Import UserRole
 import pytest_asyncio
 from tortoise import Tortoise, connections
-from tortoise.contrib.test import finalizer, initializer
-from app import settings
 
 # Define the models Tortoise should know about for tests
 MODELS = [

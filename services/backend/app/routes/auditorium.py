@@ -1,11 +1,13 @@
+from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import UUID4
 
-from app.schemas import CreateAuditorium, UpdateAuditorium, GetAuditorium, DeleteAuditorium
+from app.schemas import CreateAuditorium, UpdateAuditorium, GetAuditorium, DeleteAuditorium, CalendarBookingEntry
 from app.utils.contrib import get_current_moderator
 from app.services.auditorium import get_auditorium_by_uuid, get_auditoriums, create_auditorium, delete_auditorium, update_auditorium
+from app.services.booking import get_bookings_for_calendar
 from app.models import User
 
 router = APIRouter()
@@ -37,9 +39,8 @@ async def route_get_auditoriums():
 async def route_update_auditorium(
     update_data: UpdateAuditorium, # Данные из тела
     auditorium_uuid: UUID4 = Path(..., title="UUID of the auditorium to update"),
-    current_user: User = CurrentModerator # Только модератор
+    current_user: User = CurrentModerator
 ):
-    # Передаем UUID из пути и данные из тела в сервис
     return await update_auditorium(
         auditorium_uuid=auditorium_uuid,
         auditorium_update_data=update_data
@@ -48,8 +49,35 @@ async def route_update_auditorium(
 @router.delete("/{auditorium_uuid}", status_code=204)
 async def route_delete_auditorium(
     auditorium_uuid: UUID4 = Path(..., title="UUID of the auditorium to delete"),
-    current_user: User = CurrentModerator # Только модератор
+    current_user: User = CurrentModerator
 ):
-    # Сервис delete_auditorium теперь сам вызывает HTTPException 404 если не найдено
     await delete_auditorium(auditorium_uuid=auditorium_uuid)
-    # Нет ответа для 204
+
+
+@router.get(
+    "/{auditorium_uuid}/calendar",
+    response_model=List[CalendarBookingEntry],
+    summary="Получить бронирования для календаря",
+    description="Возвращает список бронирований для указанной аудитории в заданном диапазоне дат, "
+                "в формате, удобном для отображения календаря."
+)
+async def route_get_auditorium_calendar(
+    auditorium_uuid: UUID4 = Path(..., title="UUID аудитории"),
+    start_date: date = Query(..., alias="startDate", description="Начальная дата диапазона (YYYY-MM-DD)"),
+    end_date: date = Query(..., alias="endDate", description="Конечная дата диапазона (YYYY-MM-DD)"),
+):
+    """
+    Получает данные о бронированиях для календаря конкретной аудитории.
+    Требует аутентификации. Доступ может быть у всех аутентифицированных пользователей
+    (чтобы видеть занятость), или можно ограничить права при необходимости.
+    """
+
+    if start_date > end_date:
+        raise HTTPException(status_code=400, detail="Дата начала не может быть позже даты окончания.")
+
+    bookings = await get_bookings_for_calendar(
+        auditorium_uuid=auditorium_uuid,
+        start_date=start_date,
+        end_date=end_date
+    )
+    return bookings

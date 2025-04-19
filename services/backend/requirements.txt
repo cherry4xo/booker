@@ -14,3 +14,4 @@ cryptography
 uvicorn
 pytest
 pytest_asyncio
+faker

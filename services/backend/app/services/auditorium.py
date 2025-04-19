@@ -2,9 +2,23 @@ from typing import List, Optional
 from fastapi import HTTPException, Depends
 
 from app.schemas import CreateAuditorium, UpdateAuditorium, DeleteAuditorium
-from app.models import Auditorium
+from app.models import Auditorium, Equipment
 from pydantic import UUID4
 
+
+async def _get_equipment_objects(equipment_uuids: Optional[List[UUID4]]) -> List[Equipment]:
+    """Вспомогательная функция для получения объектов Equipment по UUID."""
+    equipment_objects = []
+    if equipment_uuids:
+        equipment_objects = await Equipment.filter(uuid__in=equipment_uuids)
+        if len(equipment_objects) != len(equipment_uuids):
+            found_uuids = {eq.uuid for eq in equipment_objects}
+            missing_uuids = [str(uuid) for uuid in equipment_uuids if uuid not in found_uuids]
+            raise HTTPException(
+                status_code=404,
+                detail=f"Following equipment UUIDs not found: {', '.join(missing_uuids)}"
+            )
+    return equipment_objects
 
 
 async def create_auditorium(auditorium_model: CreateAuditorium) -> Auditorium:

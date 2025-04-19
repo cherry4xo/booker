@@ -1,6 +1,8 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from datetime import date, datetime, time
+
+from app.enums import UserRole
 
 from pydantic import BaseModel, UUID4, ConfigDict, EmailStr, Field, field_validator
 
@@ -14,7 +16,7 @@ class BaseUser(BaseSchema):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     telegram_id: Optional[str] = None
-    role: Optional[str] = None
+    role: Optional[UserRole] = None
 
 
 class UserCreate(BaseModel):
@@ -27,14 +29,28 @@ class UserCreated(BaseSchema):
     uuid: UUID4
     username: str
     email: EmailStr
+    registration_date: date
+    role: UserRole
+
+    class Config:
+        orm_mode = True
 
 
 class UserGet(BaseSchema):
     uuid: UUID4
     username: str
     email: EmailStr
+    registration_date: date
     telegram_id: Optional[str] = None
     role: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+
+class UserUpdateProfile(BaseModel): # Схема для PATCH /users/me
+    # Добавьте другие поля, которые пользователь может редактировать
+    telegram_id: Optional[str] = None
 
 
 class UserChangePasswordIn(BaseModel):
@@ -43,7 +59,13 @@ class UserChangePasswordIn(BaseModel):
 
 
 class UserGrantPrivileges(BaseModel):
-    role: str # Роль передается в теле
+    role: UserRole # Роль передается в теле
+
+    @field_validator('role')
+    def role_must_be_valid(cls, v):
+        if v not in UserRole.list():
+            raise ValueError(f"Invalid role. Must be one of: {UserRole.list()}")
+        return v
 
 
 class CreateEquipment(BaseModel):
@@ -55,6 +77,9 @@ class GetEquipment(BaseSchema):
     uuid: UUID4
     name: str
     description: Optional[str] = None
+
+    class Config:
+        orm_mode = True
 
 
 class UpdateEquipment(BaseModel):
@@ -70,6 +95,7 @@ class CreateAuditorium(BaseModel):
     identifier: str
     capacity: int = Field(..., gt=0)
     description: Optional[str] = None
+    equipment_uuids: Optional[List[UUID4]] = Field(None, description="List of equipment UUIDs to associate")
 
 
 class GetAuditorium(BaseSchema):
@@ -85,6 +111,8 @@ class UpdateAuditorium(BaseModel):
     identifier: Optional[str] = None
     capacity: Optional[int] = Field(None, gt=0)
     description: Optional[str] = None
+    equipment_uuids: Optional[List[UUID4]] = Field(None, description="List of equipment UUIDs to set (replaces existing)")
+
 
 class DeleteAuditorium(BaseModel):
     uuid: UUID4
@@ -111,6 +139,18 @@ class GetAvailability(BaseSchema):
     day_of_week: int
     start_time: time # time
     end_time: time   # time
+
+
+class CalendarBookingEntry(BaseSchema):
+    """
+    Упрощенная схема бронирования для отображения в календаре.
+    Поля 'start' и 'end' часто используются в библиотеках календарей.
+    """
+    uuid: UUID4 = Field(..., description="Уникальный идентификатор бронирования")
+    title: Optional[str] = Field(None, description="Название/описание бронирования (может быть пустым)")
+    start: datetime = Field(..., description="Время начала бронирования")
+    end: datetime = Field(..., description="Время окончания бронирования")
+
 
 class UpdateAvailability(BaseModel):
     day_of_week: Optional[int] = Field(None, ge=0, le=6)

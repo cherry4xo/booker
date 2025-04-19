@@ -130,7 +130,7 @@ async def get_all_availabilities() -> List[AvailabilitySlot]: # Возвраща
     return availabilities
 
 
-async def update_availabilities( # Название лучше update_availability
+async def update_availability( # Название лучше update_availability
     availability_uuid: UUID4,
     availability_update_data: UpdateAvailability
 ) -> AvailabilitySlot: # Возвращаем модель

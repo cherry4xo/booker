@@ -8,7 +8,8 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from services.backend.app.services import users as user_service
-from services.backend.app.models import User, UserRole
+from services.backend.app.models import User
+from app.enums import UserRole
 from services.backend.app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges
 from services.backend.app.utils import password # Импортируем модуль паролей
 
