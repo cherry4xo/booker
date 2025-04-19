@@ -90,12 +90,19 @@ async def check_auditorium_availability(
     return True
 
 
-async def get_booking_by_uuid(
-    uuid: UUID4
-) -> GetBooking:
-    booking = await Booking.get_or_none(uuid=uuid)
+async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Optional[Booking]: # Возвращаем модель
+    """ Получает бронирование по UUID с проверкой прав """
+    booking = await Booking.get_or_none(uuid=booking_uuid).prefetch_related('broker', 'auditorium')
+
     if not booking:
-        raise HTTPException(status_code=404, detail="Бронирование не найдено")
+        return None
+
+    # --- Проверка прав доступа ---
+    if booking.broker_id != current_user.uuid and current_user.role != UserRole.MODERATOR:
+        raise HTTPException(
+            status_code=403,
+            detail="Недостаточно прав для просмотра этого бронирования."
+        )
     return booking
 
 
@@ -129,7 +136,8 @@ async def check_booking_overlap(
     return True
 
 
-async def create_booking(booking_model: CreateBooking, current_user: User) -> GetBooking:
+async def create_booking(booking_model: CreateBooking, current_user: User) -> Booking: # Возвращаем модель
+    """ Создает новое бронирование """
     auditorium = await Auditorium.get_or_none(uuid=booking_model.auditorium)
     if not auditorium:
         raise HTTPException(
@@ -139,36 +147,46 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Ge
 
     start = booking_model.start_time
     end = booking_model.end_time
+    # Убедимся что TZ info консистентно (если используется)
+    # ... (логика обработки TZ)
+
     await check_auditorium_availability(auditorium_uuid=booking_model.auditorium, start_dt=start, end_dt=end)
     await check_booking_overlap(auditorium_uuid=booking_model.auditorium, start=start, end=end)
 
     try:
+        # Создаем объект Booking, UUID генерируется Tortoise
         new_booking = Booking(
-            **booking_model.model_dump(exclude={'auditorium_id'}),
+            # uuid=uuid.uuid4(), # Генерируем UUID здесь, если Tortoise не настроен на автогенерацию PK
             auditorium=auditorium,
-            broker=current_user
+            broker=current_user,
+            start_time=start,
+            end_time=end,
+            title=booking_model.title
         )
         await new_booking.save()
-        await new_booking.fetch_related('broker', 'auditorium')
-        return new_booking
+        await new_booking.fetch_related('broker', 'auditorium') # Подгружаем для возврата
+        return new_booking # Возвращаем объект модели
     except IntegrityError as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка базы данных при создании бронирования: {e}"
+            status_code=409, # Может быть конфликт UUID если генерируем вручную и не уникально
+            detail=f"Ошибка целостности данных при создании бронирования: {e}"
         )
     except Exception as e:
+        print(f"Unexpected error creating booking: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Неожиданная ошибка при создании бронирования: {e}"
+            detail=f"Неожиданная ошибка при создании бронирования."
         )
+    
     
 async def update_booking(
     booking_uuid: UUID4,
-    booking_update_data: UpdateBooking,
+    booking_update_data: UpdateBooking, # Используем схему UpdateBooking
     current_user: User
-) -> Booking:
+) -> Booking: # Возвращаем модель
     """ Обновляет существующее бронирование """
-    booking = await Booking.get_or_none(uuid=booking_uuid).prefetch_related('broker', 'auditorium') # Подгружаем аудиторию сразу
+    # Используем стандартный метод Tortoise
+    booking = await Booking.get_or_none(uuid=booking_uuid).prefetch_related('broker', 'auditorium')
 
     if not booking:
         raise HTTPException(status_code=404, detail="Бронирование не найдено")
@@ -176,11 +194,12 @@ async def update_booking(
     # Проверка прав: пользователь является создателем брони ИЛИ модератором
     if booking.broker_id != current_user.uuid and current_user.role != UserRole.MODERATOR:
         raise HTTPException(
-            status_code=404,
+            status_code=403, # Исправлен статус на 403
             detail="Недостаточно прав для изменения этого бронирования."
         )
 
-    update_data = booking_update_data.model_dump(exclude_unset=True, exclude={'uuid'}) # Исключаем uuid
+    # Используем exclude_unset=True для поддержки PATCH-семантики
+    update_data = booking_update_data.model_dump(exclude_unset=True)
 
     # Определяем финальные значения для проверки и обновления
     final_start_time = update_data.get('start_time', booking.start_time)
@@ -188,59 +207,43 @@ async def update_booking(
     final_auditorium_uuid = update_data.get('auditorium', booking.auditorium_id)
 
     # --- Проверки перед обновлением ---
-    # 1. Проверка, изменилась ли аудитория
-    final_auditorium = booking.auditorium # Текущая аудитория по умолчанию
+    final_auditorium = booking.auditorium
     if 'auditorium' in update_data and update_data['auditorium'] != booking.auditorium_id:
+        final_auditorium_uuid = update_data['auditorium'] # Берем UUID из данных для обновления
         final_auditorium = await Auditorium.get_or_none(uuid=final_auditorium_uuid)
         if not final_auditorium:
             raise HTTPException(
                 status_code=404,
                 detail=f"Новая аудитория с UUID {final_auditorium_uuid} не найдена."
             )
-        # Если аудитория меняется, нужно присвоить объект полю 'auditorium' в update_data
-        update_data['auditorium'] = final_auditorium
-    else:
-         # Если аудитория не меняется, убираем ее ID из данных для обновления,
-         # чтобы не пытаться обновить FK по ID. Или передаем текущий объект.
-         if 'auditorium' in update_data:
-             del update_data['auditorium'] # Убираем ID, т.к. объект не меняется
+        # Для обновления через update_from_dict нужно передать auditorium_id
+        update_data['auditorium_id'] = final_auditorium.uuid
+        del update_data['auditorium'] # Удаляем ключ 'auditorium', оставляем 'auditorium_id'
+    elif 'auditorium' in update_data:
+         # Если UUID аудитории передан, но он тот же самый, удаляем его из update_data
+         del update_data['auditorium']
 
 
-    # 2. Проверка доступности и пересечений для *новых* параметров
     await check_auditorium_availability(
-        auditorium_uuid=final_auditorium_uuid,
+        auditorium_uuid=final_auditorium_uuid, # Используем UUID аудитории
         start_dt=final_start_time,
         end_dt=final_end_time
     )
     await check_booking_overlap(
-        auditorium_uuid=final_auditorium_uuid,
+        auditorium_uuid=final_auditorium_uuid, # Используем UUID аудитории
         start=final_start_time,
         end=final_end_time,
-        exclude_booking_uuid=booking_uuid # Исключаем текущую бронь из проверки
+        exclude_booking_uuid=booking_uuid
     )
     # --- Конец проверок ---
 
     # Применяем изменения к объекту booking
-    # Можно использовать update_from_dict или присваивать поля вручную
-    for key, value in update_data.items():
-        setattr(booking, key, value)
+    # Используем update_from_dict для простоты
+    await booking.update_from_dict(update_data).save()
 
-    try:
-        await booking.save()
-        # Подгружаем связанные объекты, если они изменились или для ответа
-        await booking.fetch_related('broker', 'auditorium')
-        return booking
-    except IntegrityError as e:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Ошибка целостности данных при обновлении бронирования: {e}"
-        )
-    except Exception as e:
-        print(f"Unexpected error updating booking: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Неожиданная ошибка при обновлении бронирования."
-        )
+    # Подгружаем связанные объекты снова, т.к. update_from_dict их сбрасывает
+    await booking.fetch_related('broker', 'auditorium')
+    return booking
 
 async def get_bookings(
     current_user: User,
@@ -248,37 +251,45 @@ async def get_bookings(
     user_uuid: Optional[UUID4] = None,
     start_date: Optional[datetime.date] = None,
     end_date: Optional[datetime.date] = None
-) -> List[Booking]:
+) -> List[Booking]: # Возвращаем список моделей
+    """ Получает список бронирований с фильтрацией и проверкой прав """
     query = Booking.all().prefetch_related('broker', 'auditorium')
+
     if current_user.role != UserRole.MODERATOR:
         query = query.filter(broker_id=current_user.uuid)
         if user_uuid is not None and user_uuid != current_user.uuid:
              raise HTTPException(status_code=403, detail="Вы не можете просматривать бронирования других пользователей.")
     elif user_uuid is not None:
-        query = query.filter(broker=user_uuid)
+        query = query.filter(broker_id=user_uuid) # Исправлено на _id
+
     if auditorium_uuid:
-        query = query.filter(auditorium=auditorium_uuid)
+        query = query.filter(auditorium_id=auditorium_uuid) # Исправлено на _id
+
     if start_date:
         start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
-        # Если работаете с Aware Timezones, убедитесь что start_datetime тоже Aware
-        # start_datetime = start_datetime.replace(tzinfo=current_user.timezone_info or datetime.timezone.utc) # Пример
+        # Добавить обработку TZ если необходимо
         query = query.filter(start_time__gte=start_datetime)
     if end_date:
         end_datetime = datetime.datetime.combine(end_date, datetime.time.max)
-        # end_datetime = end_datetime.replace(tzinfo=current_user.timezone_info or datetime.timezone.utc) # Пример
+        # Добавить обработку TZ если необходимо
         query = query.filter(end_time__lte=end_datetime)
+
     bookings = await query.order_by('start_time')
     return bookings
 
 
 async def delete_booking(booking_uuid: UUID4, current_user: User) -> bool:
+    """ Удаляет бронирование по UUID с проверкой прав """
+    # Используем стандартный метод Tortoise
     booking = await Booking.get_or_none(uuid=booking_uuid)
     if not booking:
         return False
+
     if booking.broker_id != current_user.uuid and current_user.role != UserRole.MODERATOR:
         raise HTTPException(status_code=403, detail="Недостаточно прав для удаления этого бронирования.")
     try:
         await booking.delete()
         return True
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Не удалось удалить бронирование: {e}")
+         print(f"Error deleting booking {booking_uuid}: {e}")
+         raise HTTPException(status_code=500, detail=f"Не удалось удалить бронирование.")

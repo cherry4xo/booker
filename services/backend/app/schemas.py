@@ -1,8 +1,8 @@
 import uuid
 from typing import Optional
-from datetime import date, datetime
+from datetime import date, datetime, time
 
-from pydantic import BaseModel, UUID4, EmailStr
+from pydantic import BaseModel, UUID4, ConfigDict, EmailStr, Field, field_validator
 
 
 class BaseUser(BaseModel):
@@ -66,21 +66,25 @@ class DeleteEquipment(BaseModel):
 
 class CreateAuditorium(BaseModel):
     identifier: str
-    capacity: str
-    description: str
+    capacity: int = Field(..., gt=0) # Изменен тип на int, добавлена валидация
+    description: Optional[str] = None # Сделаем description опциональным при создании
 
 
 class GetAuditorium(BaseModel):
     uuid: UUID4
     identifier: str
-    capacity: str
-    description: str
+    capacity: int # Изменен тип на int
+    description: Optional[str] = None # Сделаем опциональным и здесь
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UpdateAuditorium(BaseModel):
-    uuid: UUID4
+    # uuid в Pydantic схеме для PATCH/PUT избыточен, если он есть в URL
+    # Сделаем его опциональным или уберем
+    uuid: Optional[UUID4] = None # Сделаем опциональным
     identifier: Optional[str] = None
-    capacity: Optional[str] = None
+    capacity: Optional[int] = Field(None, gt=0) # Изменен тип на int, добавлена валидация
     description: Optional[str] = None
 
 class DeleteAuditorium(BaseModel):
@@ -88,53 +92,64 @@ class DeleteAuditorium(BaseModel):
 
 
 class CreateAvailability(BaseModel):
-    uuid: UUID4
+    # UUID обычно генерируется сервером
+    # uuid: UUID4
     auditorium: UUID4
-    day_of_week: int
-    start_time: datetime
-    end_time: datetime
+    day_of_week: int = Field(..., ge=0, le=6)
+    start_time: time # Изменен тип на time
+    end_time: time   # Изменен тип на time
 
 
 class GetAvailability(BaseModel):
     uuid: UUID4
-    auditorium: UUID4
+    auditorium_id: UUID4 # Возвращаем ID аудитории
     day_of_week: int
-    start_time: datetime
-    end_time: datetime
+    start_time: time # Изменен тип на time
+    end_time: time   # Изменен тип на time
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UpdateAvailability(BaseModel):
-    uuid: UUID4
-    auditorium: Optional[UUID4] = None
-    day_of_week: Optional[int] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    # uuid: UUID4 # Избыточен, если есть в URL
+    auditorium: Optional[UUID4] = None # Позволяем менять аудиторию? Редко нужно.
+    day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    start_time: Optional[time] = None # Изменен тип на time
+    end_time: Optional[time] = None   # Изменен тип на time
 
 
 class DeleteAvailability(BaseModel):
     uuid: UUID4
 
 
+
 class CreateBooking(BaseModel):
-    uuid: UUID4
     auditorium: UUID4
     start_time: datetime
     end_time: datetime
     title: Optional[str] = None
 
+    # Добавим валидатор времени
+    @field_validator('end_time')
+    def end_time_must_be_after_start_time(cls, v, values):
+        if 'start_time' in values.data and v <= values.data['start_time']:
+            raise ValueError('Booking end time must be after start time')
+        return v
+
 
 class GetBooking(BaseModel):
     uuid: UUID4
-    auditorium: Optional[UUID4] = None
-    booker: Optional[UUID4] = None
+    auditorium_id: UUID4 = Field(..., alias="auditorium") # Маппинг поля модели auditorium -> auditorium_id
+    broker_id: UUID4 = Field(..., alias="booker") # Маппинг поля модели broker -> broker_id
     start_time: datetime
     end_time: datetime
     title: Optional[str] = None
 
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True) 
+
 
 class UpdateBooking(BaseModel):
-    uuid: UUID4
-    auditorium: Optional[UUID4] = None
+    auditorium: Optional[UUID4] = None # Позволяем менять аудиторию
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     title: Optional[str] = None
