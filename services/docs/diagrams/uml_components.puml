@@ -1,0 +1,58 @@
+@startuml uml_components
+skinparam componentStyle rectangle
+skinparam linetype ortho
+left to right direction
+
+skinparam component {
+    BackgroundColor #F8F9F9
+    BorderColor #2C3E50
+    ArrowColor #2980B9
+    FontName "Segoe UI"
+    FontSize 13
+}
+
+skinparam database {
+    BackgroundColor #FDFEFE
+    BorderColor #566573
+    FontName "Segoe UI"
+}
+
+' Services
+component "User Service" as UserService
+component "Booking Service" as BookingService
+component "Auditorium Service" as AuditoriumService
+component "Equipment Service" as EquipmentService
+component "Availability Service" as AvailabilityService
+
+' Replace interface with styled blocks
+rectangle "User\n<<interface>>" as IUser
+rectangle "Booking\n<<interface>>" as IBooking
+rectangle "Auditorium\n<<interface>>" as IAuditorium
+rectangle "Equipment\n<<interface>>" as IEquipment
+rectangle "Availability\n<<interface>>" as IAvailability
+
+' Data storage
+database "PostgreSQL" as PostgreSQL
+
+' Interfaces
+UserService --> IUser
+BookingService --> IBooking
+AuditoriumService --> IAuditorium
+EquipmentService --> IEquipment
+AvailabilityService --> IAvailability
+
+' Services to database
+UserService --> PostgreSQL : users
+BookingService --> PostgreSQL : bookings
+AuditoriumService --> PostgreSQL : auditoriums
+EquipmentService --> PostgreSQL : equipment
+AvailabilityService --> PostgreSQL : availability_slots
+
+' Service interactions
+BookingService --> UserService : auth
+BookingService --> AuditoriumService : check rooms
+BookingService --> AvailabilityService : check slots
+AuditoriumService --> EquipmentService : configure equipment
+AuditoriumService --> AvailabilityService : manage schedule
+
+@enduml

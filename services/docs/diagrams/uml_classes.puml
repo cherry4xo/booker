@@ -1,0 +1,81 @@
+@startuml uml_classes
+top to bottom direction
+
+skinparam class {
+    BackgroundColor #F8F9F9
+    BorderColor #2C3E50
+    ArrowColor #2980B9
+    FontName "Segoe UI"
+    FontSize 13
+}
+skinparam linetype ortho
+hide circle
+
+enum UserRole {
+    BOOKER
+    MODERATOR
+}
+
+abstract class BaseModel {
+    +to_dict()
+}
+
+class TimestampMixin << (M,#D6EAF8) >> {
+    created_at: DateTime <<auto_now_add>>
+    updated_at: DateTime <<auto_now>>
+}
+
+class User << (U,#AED6F1) >> {
+    *uuid: UUID <<PK>>
+    username: String <<unique, nullable>>
+    email: String <<unique, nullable>>
+    password_hash: String <<nullable>>
+    registration_date: Date <<auto_now_add>>
+    role: UserRole
+    --
+    +get_by_username(username: String)
+}
+
+class Booking << (B,#ABEBC6) >> {
+    *uuid: UUID <<PK>>
+    start_time: Time
+    end_time: Time
+    title: String <<nullable>>
+}
+
+class Auditorium << (A,#FADBD8) >> {
+    *uuid: UUID <<PK>>
+    identifier: String <<unique>>
+    capacity: Integer
+    description: Text <<nullable>>
+}
+
+class Equipment << (E,#F9E79F) >> {
+    *uuid: UUID <<PK>>
+    name: String <<unique>>
+    description: Text <<nullable>>
+    --
+    +get_by_name(name: String)
+}
+
+class AvailabilitySlot << (S,#D2B4DE) >> {
+    *uuid: UUID <<PK>>
+    day_of_week: Int <<0-6>>
+    start_time: Time
+    end_time: Time
+}
+
+BaseModel <|-- User
+BaseModel <|-- Booking
+BaseModel <|-- Auditorium
+BaseModel <|-- Equipment
+BaseModel <|-- AvailabilitySlot
+
+User ..|> TimestampMixin
+
+User "1" ||--o{ Booking : broker
+Booking }o--|| Auditorium : auditorium
+Auditorium ||--o{ AvailabilitySlot : availability_slots
+Auditorium }o--o{ Equipment : equipment
+
+@enduml

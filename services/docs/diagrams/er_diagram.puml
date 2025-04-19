@@ -1,0 +1,81 @@
+@startuml er_diagram
+' ER-диаграма в нотации Чена
+
+skinparam class {
+    BackgroundColor #F8F9F9
+    BorderColor #2C3E50
+    ArrowColor #2980B9
+    FontName "Segoe UI"
+}
+
+left to right direction
+hide circle
+
+entity User {
+  *uuid : UUID <<PK>>
+  --
+  username : String <<unique, nullable>>
+  email : String <<unique, nullable>>
+  password_hash : String <<nullable>>
+  registration_date : Date <<auto_now_add>>
+  role : UserRole
+  created_at : DateTime <<auto_now_add>>
+  updated_at : DateTime <<auto_now>>
+}
+
+entity Booking {
+  *uuid : UUID <<PK>>
+  --
+  broker_id : UUID <<FK>>
+  auditorium_id : UUID <<FK>>
+  start_time : Time
+  end_time : Time
+  title : String <<nullable>>
+  created_at : DateTime <<auto_now_add>>
+  updated_at : DateTime <<auto_now>>
+}
+
+entity Auditorium {
+  *uuid : UUID <<PK>>
+  --
+  identifier : String <<unique>>
+  capacity : Integer
+  description : Text <<nullable>>
+  created_at : DateTime <<auto_now_add>>
+  updated_at : DateTime <<auto_now>>
+}
+
+entity Equipment {
+  *uuid : UUID <<PK>>
+  --
+  name : String <<unique>>
+  description : Text <<nullable>>
+  created_at : DateTime <<auto_now_add>>
+  updated_at : DateTime <<auto_now>>
+}
+
+entity AvailabilitySlot {
+  *uuid : UUID <<PK>>
+  --
+  auditorium_id : UUID <<FK>>
+  day_of_week : Integer <<0=Monday,6=Sunday>>
+  start_time : Time <<HH:MM>>
+  end_time : Time <<HH:MM>>
+  created_at : DateTime <<auto_now_add>>
+  updated_at : DateTime <<auto_now>>
+}
+
+entity AuditoriumEquipment {
+  *uuid : UUID <<PK>>
+  auditorium_id  : UUID <<FK>>
+  equipment_id  : UUID <<FK>>
+}
+
+User    ||--o{ Booking           : "creates (1..N)"
+Booking }o--|| Auditorium       : "books (N..1)"
+Auditorium ||--o{ AvailabilitySlot : "has schedule (1..N)"
+Auditorium }o--o{ Equipment      : "equipped with (M:N)"
+
+AuditoriumEquipment ||..|| Auditorium : "auditorium_id (FK)"
+AuditoriumEquipment ||..|| Equipment   : "equipment_id (FK)"
+@enduml
