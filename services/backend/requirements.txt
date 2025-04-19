@@ -11,3 +11,4 @@ python-multipart
 email-validator
 bcrypt
 cryptography
+uvicorn

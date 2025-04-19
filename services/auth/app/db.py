@@ -46,6 +46,6 @@ async def upgrade_db(app: FastAPI, db_url: str = None):
     await command.upgrade(run_in_transaction=True)
 
 async def init(app: FastAPI):
-    await upgrade_db(app)
+    # await upgrade_db(app)
     register_db(app)
     logger.debug("Connected to db")

@@ -16,6 +16,9 @@ class BaseModel(Model):
             d[field] = await getattr(self, field).all().values()
         return d
     
+    class Meta:
+        abstract = True
+
 
 class UserRole(str, enum.Enum):
     """ Defines the roles a user can have """
@@ -34,6 +37,7 @@ class User(TimestampMixin, BaseModel):
     email = fields.CharField(max_length=255, unique=True, null=True)
     password_hash = fields.CharField(max_length=255, null=True)
     registration_date = fields.DateField(auto_now_add=True)
+    telegram_id = fields.CharField(max_length=255, null=True)
     role = fields.CharEnumField(UserRole, default=UserRole.BOOKER, description="User role")
 
     @classmethod
@@ -78,7 +82,7 @@ class Equipment(BaseModel):
 class AvailabilitySlot(BaseModel):
     uuid = fields.UUIDField(pk=True)
     auditorium: fields.ForeignKeyRelation["Auditorium"] = fields.ForeignKeyField(
-        "models.auditorium", related_name="availability_slots", on_delete=fields.CASCADE
+        "models.Auditorium", related_name="availability_slots", on_delete=fields.CASCADE
     )
     day_of_week = fields.IntField(description="Day of the week (0=Monday, 6=Sunday)")
     start_time = fields.TimeField(description="Start time of the slot")
@@ -99,8 +103,8 @@ class Auditorium(BaseModel):
     identifier = fields.CharField(max_length=100, unique=True)
     capacity = fields.IntField()
     desctiption = fields.TextField(null=True)
-    equipment: fields.ManyToManyField["Equipment"] = fields.ManyToManyField(
-        "models.equipment", related_name="auditoriums_equipment", through="auditorium_equipment"
+    equipment: fields.ManyToManyRelation["Equipment"] = fields.ManyToManyField(
+        "models.Equipment", related_name="auditoriums_equipment", through="auditorium_equipment"
     )
 
     availability_schedule = fields.ReverseRelation["AvailabilitySlot"]
@@ -116,11 +120,11 @@ class Auditorium(BaseModel):
 
 class Booking(BaseModel):
     uuid = fields.UUIDField(pk=True)
-    broker: fields.ForeignKeyField["User"] = fields.ForeignKeyField(
-        "models.user", related_name="bookings", on_delete=fields.CASCADE
+    broker: fields.ForeignKeyRelation["User"] = fields.ForeignKeyField(
+        "models.User", related_name="bookings", on_delete=fields.CASCADE
     )
     auditorium: fields.ForeignKeyRelation["Auditorium"] = fields.ForeignKeyField(
-        "models.auditorium", related_name="bookings", on_delete=fields.CASCADE
+        "models.Auditorium", related_name="bookings", on_delete=fields.CASCADE
     )
     start_time = fields.TimeField()
     end_time = fields.TimeField()
