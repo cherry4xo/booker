@@ -2,7 +2,8 @@ from fastapi import HTTPException, Depends
 from pydantic import UUID4
 
 from app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges
-from app.models import User, UserRole
+from app.models import User
+from app.enums import UserRole
 from app.utils import password
 from app.utils.contrib import get_current_user
 

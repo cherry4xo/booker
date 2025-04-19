@@ -11,8 +11,9 @@ from tortoise.exceptions import DoesNotExist, IntegrityError
 
 # Импортируем тестируемые функции и необходимые модели/схемы/enum
 from services.backend.app.services import booking as booking_service
-from services.backend.app.models import Booking, User, Auditorium, AvailabilitySlot, UserRole
+from services.backend.app.models import Booking, User, Auditorium, AvailabilitySlot
 from services.backend.app.schemas import CreateBooking, UpdateBooking
+from app.enums import UserRole
 
 # Фикстуры для создания mock-объектов
 @pytest.fixture

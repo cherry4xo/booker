@@ -8,7 +8,8 @@ from aerich import Command, exceptions as aerich_exceptions
 from fastapi import FastAPI
 
 from app import settings
-from app.models import User, UserRole
+from app.enums import UserRole
+from app.models import User
 from app.schemas import UserCreate
 
 logger = logging.getLogger(__name__)

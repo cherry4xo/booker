@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, time
+from datetime import date, datetime, timedelta, time
 from builtins import min as builtin_min
 from typing import List, Optional
 
@@ -6,7 +6,8 @@ from fastapi import HTTPException, Depends
 from tortoise.exceptions import IntegrityError
 
 from app.schemas import CreateBooking, GetBooking, UpdateBooking, DeleteBooking
-from app.models import Auditorium, AvailabilitySlot, User, Booking, UserRole
+from app.models import Auditorium, AvailabilitySlot, User, Booking
+from app.enums import UserRole
 from pydantic import UUID4
 
 
@@ -299,3 +300,39 @@ async def delete_booking(booking_uuid: UUID4, current_user: User) -> bool:
     except Exception as e:
          print(f"Error deleting booking {booking_uuid}: {e}")
          raise HTTPException(status_code=500, detail=f"Не удалось удалить бронирование.")
+
+
+async def get_bookings_for_calendar(
+    auditorium_uuid: UUID4,
+    start_date: date,
+    end_date: date
+) -> List[Booking]:
+    """
+    Получает список бронирований для указанной аудитории в заданном диапазоне дат.
+    Возвращает список моделей Booking, готовых для преобразования в CalendarBookingEntry.
+    """
+    # Преобразуем даты в datetime для корректного сравнения с полями модели
+    # Включаем весь день для start_date и end_date
+    start_dt = datetime.combine(start_date, time.min)
+    end_dt = datetime.combine(end_date, time.max)
+
+    # Добавляем обработку часовых поясов, если ваше приложение их использует
+    # Например, если start_dt/end_dt должны быть в UTC:
+    # from app.utils.timezone import make_aware # Пример хелпера
+    # start_dt = make_aware(start_dt)
+    # end_dt = make_aware(end_dt)
+    # Или используйте timezone.utc из datetime, если время хранится в UTC
+
+    # Запрос для поиска бронирований, которые *пересекаются* с заданным диапазоном [start_dt, end_dt]
+    # Условие пересечения: (BookingStart < QueryEnd) AND (BookingEnd > QueryStart)
+    query = Booking.filter(
+        auditorium_id=auditorium_uuid,
+        start_time__lt=end_dt,  # Бронь начинается до конца запрашиваемого периода
+        end_time__gt=start_dt   # Бронь заканчивается после начала запрашиваемого периода
+    ).order_by('start_time')
+
+    # Если в схеме CalendarBookingEntry нужно имя пользователя, добавь prefetch:
+    # query = query.prefetch_related('broker')
+
+    bookings = await query.all()
+    return bookings

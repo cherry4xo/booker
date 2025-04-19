@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -28,8 +28,8 @@ async def handle_read_bookings(
     # Используем Query для параметров фильтрации
     auditorium_id: Optional[UUID4] = Query(None, alias="auditoriumId", description="Фильтр по UUID аудитории"),
     user_id: Optional[UUID4] = Query(None, alias="userId", description="Фильтр по UUID пользователя (только для модераторов)"),
-    start_date: Optional[datetime.date] = Query(None, alias="startDate", description="Начальная дата для фильтрации (YYYY-MM-DD)"),
-    end_date: Optional[datetime.date] = Query(None, alias="endDate", description="Конечная дата для фильтрации (YYYY-MM-DD)")
+    start_date: Optional[date] = Query(None, alias="startDate", description="Начальная дата для фильтрации (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, alias="endDate", description="Конечная дата для фильтрации (YYYY-MM-DD)")
 ):
     """ Возвращает список бронирований с возможностью фильтрации. """
     bookings_list = await get_bookings(

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import UUID4
 from tortoise.exceptions import IntegrityError
 
@@ -23,16 +23,18 @@ async def route_get_equipment(uuid: UUID4):
     return await get_equipment_by_id(uuid=uuid)
 
 
-@router.patch("/", response_model=GetEquipment, status_code=200)
-async def update_equipment(equipment_update: UpdateEquipment, current_user: User = Depends(get_current_moderator)):
-    equipment = await Equipment.get_by_id(uuid=equipment_update.uuid)
-    update_data = equipment.model_dump(exclude_unset=True)
-    equipment = equipment.update_from_dict(update_data)
-    try:
-        await equipment.save()
-    except IntegrityError:
-        raise HTTPException(status_code=400, detail=f"Equipment name conflict.")
-    return equipment
+@router.patch("/{equipment_uuid}", response_model=GetEquipment, status_code=200)
+async def update_equipment(
+    equipment_update: UpdateEquipment, 
+    equipment_uuid: UUID4 = Path(..., title="UUID оборудования для обновления"),
+    current_user: User = Depends(get_current_moderator)
+):
+    updated_equipment = await update_equipment(
+        equipment_uuid=equipment_uuid,
+        equipment_update=equipment_update
+    )
+    # Сервис кидает 404, 409
+    return updated_equipment
 
 
 @router.get("/", response_model=List[GetEquipment], status_code=200)

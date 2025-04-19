@@ -4,7 +4,8 @@ import jwt
 from fastapi import HTTPException, Security
 from fastapi.security import OAuth2PasswordBearer
 
-from app.models import User, UserRole
+from app.models import User
+from app.enums import UserRole
 from app.schemas import JWTTokenPayload
 from app import settings
 

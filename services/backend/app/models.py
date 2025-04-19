@@ -11,6 +11,7 @@ from tortoise.exceptions import DoesNotExist
 
 from app.utils import password
 from app.schemas import UserCreate, CreateEquipment, CreateAuditorium, CreateAvailability, CreateBooking
+from app.enums import UserRole
 
 
 class BaseModel(Model):
@@ -24,16 +25,6 @@ class BaseModel(Model):
     
     class Meta:
         abstract = True
-
-
-class UserRole(str, enum.Enum):
-    @classmethod
-    def list(cls):
-        return list(map(lambda c: c.value, cls))
-
-    """ Defines the roles a user can have """
-    BOOKER = "booker"
-    MODERATOR = "moderator"
 
 
 class TimestampMixin:
