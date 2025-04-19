@@ -12,3 +12,5 @@ email-validator
 bcrypt
 cryptography
 uvicorn
+pytest
+pytest_asyncio
