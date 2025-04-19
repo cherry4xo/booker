@@ -22,16 +22,25 @@ async def _get_equipment_objects(equipment_uuids: Optional[List[UUID4]]) -> List
 
 
 async def create_auditorium(auditorium_model: CreateAuditorium) -> Auditorium:
-    # Проверка на уникальность identifier (Tortoise сделает это при .save(), но можно и заранее)
     existing = await Auditorium.get_or_none(identifier=auditorium_model.identifier)
     if existing:
         raise HTTPException(
             status_code=409,
             detail=f"Auditorium with identifier '{auditorium_model.identifier}' already exists."
         )
-    # Используем прямое создание, а не classmethod модели
-    auditorium = Auditorium(**auditorium_model.model_dump())
+    equipment_to_add = []
+    if hasattr(auditorium_model, 'equipment_uuids') and auditorium_model.equipment_uuids:
+         equipment_to_add = await _get_equipment_objects(auditorium_model.equipment_uuids)
+         create_data = auditorium_model.model_dump(exclude={'equipment_uuids'})
+    else:
+         create_data = auditorium_model.model_dump()
+
+    auditorium = Auditorium(**create_data)
     await auditorium.save()
+
+    if equipment_to_add:
+        await auditorium.equipment.add(*equipment_to_add)
+    await auditorium.fetch_related('equipment') 
     return auditorium
 
 
@@ -44,32 +53,48 @@ async def update_auditorium(auditorium_uuid: UUID4, auditorium_update_data: Upda
 
     # Проверка уникальности identifier, если он меняется
     if 'identifier' in update_data and update_data['identifier'] != auditorium.identifier:
-         existing = await Auditorium.get_or_none(identifier=update_data['identifier'])
-         if existing:
-             raise HTTPException(
+        existing = await Auditorium.get_or_none(identifier=update_data['identifier'])
+        if existing:
+            raise HTTPException(
                 status_code=409,
                 detail=f"Auditorium with identifier '{update_data['identifier']}' already exists."
-             )
+            )
 
-    await auditorium.update_from_dict(update_data).save() # Добавлен .save()
-    # Можно добавить prefetch_related('equipment') если нужно вернуть с оборудованием
+    await auditorium.update_from_dict(update_data).save()
+    await auditorium.fetch_related('equipment')
     return auditorium
 
 
-async def delete_auditorium(auditorium_uuid: UUID4): # Принимаем UUID
-    auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid) # Используем get_or_none
+async def delete_auditorium(auditorium_uuid: UUID4):
+    auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
     if not auditorium:
         raise HTTPException(status_code=404, detail="Auditorium not found")
     await auditorium.delete()
 
 
-async def get_auditorium_by_uuid(auditorium_uuid: UUID4) -> Optional[Auditorium]: # Возвращаем Optional[Model]
-    # Добавить .prefetch_related('equipment', 'availability_slots') если нужно
+async def get_auditorium_by_uuid(auditorium_uuid: UUID4) -> Optional[Auditorium]:
     auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
-    # Проверка на 404 теперь в роутере или при использовании результата
+    if auditorium:
+        await auditorium.fetch_related('equipment') 
     return auditorium
 
 
-async def get_auditoriums() -> List[Auditorium]:
-    auditoriums = await Auditorium.all().prefetch_related('equipment', 'availability_slots')
+async def get_auditoriums(
+    min_capacity: Optional[int] = None,
+    equipment_id: Optional[UUID4] = None
+) -> List[Auditorium]:
+    """
+    Получает список аудиторий с опциональной фильтрацией
+    по минимальной вместимости и наличию оборудования.
+    """
+    query = Auditorium.all()
+
+    if min_capacity is not None:
+        query = query.filter(capacity__gte=min_capacity)
+
+    if equipment_id is not None:
+        query = query.filter(equipment__uuid=equipment_id).distinct()
+    query = query.prefetch_related('equipment')
+    auditoriums = await query.order_by('identifier')
+
     return auditoriums

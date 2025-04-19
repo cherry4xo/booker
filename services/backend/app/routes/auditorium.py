@@ -55,7 +55,7 @@ async def route_delete_auditorium(
 
 
 @router.get(
-    "/{auditorium_uuid}/calendar",
+    "/calendar/{auditorium_uuid}",
     response_model=List[CalendarBookingEntry],
     summary="Получить бронирования для календаря",
     description="Возвращает список бронирований для указанной аудитории в заданном диапазоне дат, "
@@ -81,3 +81,40 @@ async def route_get_auditorium_calendar(
         end_date=end_date
     )
     return bookings
+
+
+@router.get(
+    "/",
+    response_model=List[GetAuditorium],
+    status_code=200,
+    summary="Получить список аудиторий с фильтрацией",
+    description="Возвращает список аудиторий, опционально отфильтрованный "
+                "по минимальной вместимости и/или наличию определенного оборудования."
+)
+async def route_get_auditoriums(
+    min_capacity: Optional[int] = Query(
+        None,
+        alias="minCapacity",
+        description="Минимальная требуемая вместимость аудитории",
+        ge=1 # Вместимость должна быть > 0
+    ),
+    equipment_id: Optional[UUID4] = Query(
+        None,
+        alias="equipmentId",
+        description="UUID оборудования, которое должно присутствовать в аудитории"
+    )
+    # current_user: User = Depends(get_current_user) # Аутентификация не обязательна для просмотра
+):
+    """
+    Возвращает список аудиторий.
+    Поддерживает фильтрацию по минимальной вместимости (minCapacity)
+    и наличию конкретного оборудования (equipmentId).
+    Доступно всем.
+    """
+    # Передаем новые параметры в сервисную функцию
+    auditoriums = await get_auditoriums(
+        min_capacity=min_capacity,
+        equipment_id=equipment_id
+    )
+    # Сервис должен выполнить prefetch_related('equipment'), чтобы схема GetAuditorium заполнилась
+    return auditoriums
