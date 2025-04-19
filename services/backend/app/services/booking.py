@@ -2,13 +2,16 @@ from datetime import date, datetime, timedelta, time
 from builtins import min as builtin_min
 from typing import List, Optional
 
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Query
 from tortoise.exceptions import IntegrityError
 
 from app.schemas import CreateBooking, GetBooking, UpdateBooking, DeleteBooking
 from app.models import Auditorium, AvailabilitySlot, User, Booking
 from app.enums import UserRole
 from pydantic import UUID4
+
+from app.utils.contrib import get_current_user
+from app.routes.booking import get_my_bookings
 
 
 async def check_auditorium_availability(
@@ -335,4 +338,37 @@ async def get_bookings_for_calendar(
     # query = query.prefetch_related('broker')
 
     bookings = await query.all()
+    return bookings
+
+
+async def get_my_bookings(
+    current_user: User,
+    auditorium_uuid: Optional[UUID4] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None
+) -> List[Booking]:
+    """
+    Получает список бронирований ТЕКУЩЕГО пользователя с возможностью фильтрации.
+    """
+    # Начинаем запрос, СРАЗУ фильтруя по ID текущего пользователя
+    query = Booking.filter(broker_id=current_user.uuid)
+
+    # Применяем опциональные фильтры
+    if auditorium_uuid:
+        query = query.filter(auditorium_id=auditorium_uuid)
+
+    # Применяем фильтры по датам (аналогично get_bookings)
+    if start_date:
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        # Добавить обработку TZ если необходимо
+        query = query.filter(start_time__gte=start_datetime) # Бронирования, начинающиеся не раньше start_date
+    if end_date:
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        # Добавить обработку TZ если необходимо
+        query = query.filter(end_time__lte=end_datetime) # Бронирования, заканчивающиеся не позже end_date
+        # Альтернативно, если нужна логика пересечения диапазона:
+        # query = query.filter(start_time__lte=end_datetime)
+
+    # Предзагрузка связанных данных для схемы GetBooking и сортировка
+    bookings = await query.prefetch_related('broker', 'auditorium').order_by('start_time')
     return bookings

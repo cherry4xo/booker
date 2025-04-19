@@ -80,7 +80,6 @@ class User(TimestampMixin, BaseModel):
 
     class Meta:
         table = "users"
-        ordering = ["username"]
 
 
 class Equipment(BaseModel):
@@ -118,7 +117,6 @@ class Equipment(BaseModel):
     
     class Meta:
         table = "equipment"
-        ordering = ["name"]
 
 
 class AvailabilitySlot(BaseModel):
@@ -158,7 +156,6 @@ class AvailabilitySlot(BaseModel):
     class Meta:
         table = "availability_slots"
         unique_together = (("auditorium", "day_of_week", "start_time"), ("auditorium", "day_of_week", "end_time"))
-        ordering = ["auditorium", "day_of_week", "start_time"]
 
     def __str__(self):
         days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -198,7 +195,6 @@ class Auditorium(BaseModel):
 
     class Meta:
         table = "auditoriums"
-        ordering = ["identifier"]
 
 
 class Booking(BaseModel):
@@ -218,7 +214,6 @@ class Booking(BaseModel):
 
     class Meta:
         table = "bookings"
-        ordering = ["start_time"]
     
     @classmethod
     async def create(cls, booking_model: CreateBooking, user: User) -> "Booking":

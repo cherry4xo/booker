@@ -20,7 +20,7 @@ async def route_create_equipment(equipment: CreateEquipment, current_user: User 
 
 @router.get("/{uuid}", response_model=GetEquipment, status_code=200)
 async def route_get_equipment(uuid: UUID4):
-    return await get_equipment_by_id(uuid=uuid)
+    return await get_equipment_by_id(equipment_uuid=uuid)
 
 
 @router.patch("/{equipment_uuid}", response_model=GetEquipment, status_code=200)

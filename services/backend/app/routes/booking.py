@@ -6,7 +6,7 @@ from pydantic import UUID4
 
 from app.schemas import CreateBooking, DeleteBooking, UpdateBooking, GetBooking
 from app.utils.contrib import get_current_moderator, get_current_user
-from app.services.booking import get_booking_by_uuid, get_bookings, create_booking, delete_booking, update_booking
+from app.services.booking import get_booking_by_uuid, get_bookings, create_booking, delete_booking, get_my_bookings, update_booking
 from app.models import User
 
 
@@ -84,3 +84,24 @@ async def handle_delete_booking(
     if not deleted:
         raise HTTPException(status_code=404, detail="Бронирование не найдено")
     return None
+
+
+@router.get("/me", response_model=List[GetBooking], summary="Получить мои бронирования")
+async def handle_read_my_bookings(
+    current_user: User = Depends(get_current_user), # Получаем текущего пользователя
+    # Добавляем те же фильтры, что и в основном GET /bookings, КРОМЕ userId
+    auditorium_id: Optional[UUID4] = Query(None, alias="auditoriumId", description="Фильтр по UUID аудитории"),
+    start_date: Optional[date] = Query(None, alias="startDate", description="Начальная дата для фильтрации (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, alias="endDate", description="Конечная дата для фильтрации (YYYY-MM-DD)")
+):
+    """
+    Возвращает список бронирований, сделанных ТЕКУЩИМ аутентифицированным пользователем.
+    Поддерживает фильтрацию по аудитории и диапазону дат.
+    """
+    my_bookings = await get_my_bookings(
+        current_user=current_user,
+        auditorium_uuid=auditorium_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+    return my_bookings

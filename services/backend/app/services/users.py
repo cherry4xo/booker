@@ -1,11 +1,12 @@
 from fastapi import HTTPException, Depends
 from pydantic import UUID4
 
-from app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges
+from app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges, UserUpdateProfile
 from app.models import User
 from app.enums import UserRole
 from app.utils import password
 from app.utils.contrib import get_current_user
+from tortoise.exceptions import IntegrityError
 
 
 async def create_user(user: UserCreate):
@@ -63,3 +64,39 @@ async def grant_user(user_uuid: UUID4, user_grant: UserGrantPrivileges):
     user.role = UserRole(user_grant.role) # Convert string value back to Enum member
     await user.save()
     return user
+
+
+async def update_profile(current_user: User, profile_data: UserUpdateProfile) -> User:
+    """
+    Обновляет данные профиля пользователя (пока только telegram_id).
+    Применяет только те поля, которые переданы в profile_data.
+    """
+    # Получаем данные из схемы, исключая не установленные (None)
+    update_data = profile_data.model_dump(exclude_unset=True)
+
+    if not update_data:
+        # Если в запросе не было данных для обновления
+        # Можно вернуть пользователя без изменений или кинуть ошибку 400
+        return current_user
+        # raise HTTPException(status_code=400, detail="Нет данных для обновления")
+
+    # Обновляем объект пользователя данными из словаря
+    current_user.update_from_dict(update_data)
+
+    try:
+        # Сохраняем изменения в БД
+        await current_user.save(update_fields=list(update_data.keys())) # Оптимизация: обновляем только измененные поля
+        print(f"Профиль пользователя {current_user.username} обновлен: {update_data}")
+    except IntegrityError as e:
+        # Обработка ошибок уникальности, если в будущем добавим такие поля в UserUpdateProfile
+        print(f"Ошибка целостности при обновлении профиля {current_user.username}: {e}")
+        # Пример: определить, какое поле вызвало конфликт, и вернуть ошибку 409
+        # if "unique_constraint_name" in str(e):
+        #     raise HTTPException(status_code=409, detail="Конфликт данных. Указанное значение уже используется.")
+        raise HTTPException(status_code=500, detail="Ошибка базы данных при обновлении профиля.")
+    except Exception as e:
+        print(f"Неожиданная ошибка при обновлении профиля {current_user.username}: {e}")
+        raise HTTPException(status_code=500, detail="Не удалось обновить профиль.")
+
+    # Возвращаем обновленный объект пользователя
+    return current_user
