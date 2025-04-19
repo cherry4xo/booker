@@ -5,6 +5,12 @@ services:
   auth:
     build: ./services/auth
     restart: unless-stopped
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: users-postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
     ports:
       - "8080:8080"
     links:
@@ -12,6 +18,12 @@ services:
   backend:
     build: ./services/backend
     restart: unless-stopped
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: users-postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
     ports:
       - "8081:8080"
     links:
@@ -27,9 +39,9 @@ services:
     image: postgres:alpine
     restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: 256128
-      POSTGRES_USER: postgres
-      POSTGRES_DB: users
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5433:5432"
     expose:
