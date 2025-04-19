@@ -30,14 +30,13 @@ async def route_get_availability(uuid: UUID4):
 @router.patch("/{availability_uuid}", response_model=GetAvailability, status_code=200)
 async def route_update_availability(
     availability_uuid: UUID4 = Path(..., title="UUID слота доступности для обновления"),
-    availability_update_data: UpdateAvailability = Body(...), # Данные из тела
+    availability_update_data: UpdateAvailability = Body(...),
     current_user: User = Depends(get_current_moderator)
 ):
     updated_availability = await update_availability(
          availability_uuid=availability_uuid,
          availability_update_data=availability_update_data
     )
-    # Сервис кидает 404, 409 (наложение)
     return updated_availability
 
 

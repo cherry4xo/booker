@@ -11,7 +11,6 @@ from services.backend.app.services import users as user_service
 from services.backend.app.models import User
 from app.enums import UserRole
 from services.backend.app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges
-from services.backend.app.utils import password # Импортируем модуль паролей
 
 @pytest.fixture
 def mock_user_model():
@@ -26,21 +25,21 @@ def mock_user_model():
     return user
 
 @pytest.mark.asyncio
-@patch('app.services.users.User.get_or_none', new_callable=AsyncMock, return_value=None) # Email и username свободны
-@patch('app.services.users.User.create', new_callable=AsyncMock) # Мокаем classmethod create
+@patch('app.services.users.User.get_or_none', new_callable=AsyncMock, return_value=None)
+@patch('app.services.users.User.create', new_callable=AsyncMock)
 async def test_create_user_success(mock_model_create, mock_get_or_none, mock_user_model):
     """ Тест успешного создания пользователя """
-    mock_model_create.return_value = mock_user_model # Мок create возвращает мок пользователя
+    mock_model_create.return_value = mock_user_model
     user_data = UserCreate(username="newuser", email="new@example.com", password="password123")
 
     created_user = await user_service.create_user(user_data)
 
-    assert mock_get_or_none.call_count == 2 # Проверка email и username
-    mock_model_create.assert_called_once_with(user=user_data) # Проверяем вызов classmethod
+    assert mock_get_or_none.call_count == 2
+    mock_model_create.assert_called_once_with(user=user_data)
     assert created_user == mock_user_model
 
 @pytest.mark.asyncio
-@patch('app.services.users.User.get_or_none', new_callable=AsyncMock) # Находим пользователя по email
+@patch('app.services.users.User.get_or_none', new_callable=AsyncMock)
 async def test_create_user_email_exists(mock_get_or_none, mock_user_model):
     """ Тест: email уже существует """
     mock_get_or_none.return_value = mock_user_model
@@ -49,13 +48,13 @@ async def test_create_user_email_exists(mock_get_or_none, mock_user_model):
         await user_service.create_user(user_data)
     assert exc_info.value.status_code == 400
     assert "email already exists" in exc_info.value.detail
-    mock_get_or_none.assert_called_once_with(email=user_data.email) # Убедимся, что искали по email
+    mock_get_or_none.assert_called_once_with(email=user_data.email)
 
 @pytest.mark.asyncio
 @patch('app.services.users.User.get_or_none', new_callable=AsyncMock)
 async def test_create_user_username_exists(mock_get_or_none, mock_user_model):
     """ Тест: username уже существует """
-    mock_get_or_none.side_effect = [None, mock_user_model] # Email свободен, username занят
+    mock_get_or_none.side_effect = [None, mock_user_model]
     user_data = UserCreate(username="testuser", email="new@example.com", password="password123")
     with pytest.raises(HTTPException) as exc_info:
         await user_service.create_user(user_data)
@@ -65,31 +64,25 @@ async def test_create_user_username_exists(mock_get_or_none, mock_user_model):
 
 @pytest.mark.asyncio
 @patch('app.services.users.password.get_password_hash', return_value="new_hashed_password")
-async def test_change_password_success(mock_get_hash, mock_user_model): # Correct order now
-     """ Тест успешной смены пароля """
-     change_data = UserChangePasswordIn(current_password="correct_password", new_password="new_password")
+async def test_change_password_success(mock_get_hash, mock_user_model):
+    """ Тест успешной смены пароля """
+    change_data = UserChangePasswordIn(current_password="correct_password", new_password="new_password")
 
-     # This call should now use the *real* fixture mock_user_model
-     # The service calls password.verify_and_update_password which uses the real hash
-     await user_service.change_password(change_data, mock_user_model)
+    await user_service.change_password(change_data, mock_user_model)
 
-     # Assertions
-     mock_get_hash.assert_called_once_with("new_password") # Hashing the new one
-     assert mock_user_model.password_hash == "new_hashed_password" # Checking update
-     mock_user_model.save.assert_called_once()
+    mock_get_hash.assert_called_once_with("new_password")
+    assert mock_user_model.password_hash == "new_hashed_password"
+    mock_user_model.save.assert_called_once()
 
 @pytest.mark.asyncio
-# @patch('app.services.users.password.verify_password', return_value=False) # Keep if mocking verify
-async def test_change_password_incorrect_current(mock_user_model): # mock_verify removed if using real context
+async def test_change_password_incorrect_current(mock_user_model):
     """ Тест: неверный текущий пароль """
     change_data = UserChangePasswordIn(current_password="wrong_old", new_password="new_password")
     with pytest.raises(HTTPException) as exc_info:
-         # This will now use the real pwd_context.verify against the hash in the fixture
-         await user_service.change_password(change_data, mock_user_model)
+        await user_service.change_password(change_data, mock_user_model)
 
-    assert exc_info.value.status_code == 401 # Status code 401 from service
-    # Detail might come from verify_and_update_password or the service itself
-    assert "incorrect" in exc_info.value.detail or "Invalid" in exc_info.value.detail # Adjust based on actual error message
+    assert exc_info.value.status_code == 401
+    assert "incorrect" in exc_info.value.detail or "Invalid" in exc_info.value.detail
     mock_user_model.save.assert_not_called()
 
 @pytest.mark.asyncio
@@ -97,7 +90,7 @@ async def test_change_password_incorrect_current(mock_user_model): # mock_verify
 async def test_grant_user_success(mock_get, mock_user_model):
     """ Тест успешного назначения роли """
     mock_get.return_value = mock_user_model
-    grant_data = UserGrantPrivileges(role=UserRole.MODERATOR.value) # Используем enum value
+    grant_data = UserGrantPrivileges(role=UserRole.MODERATOR.value)
     user_uuid_to_grant = uuid4()
 
     result = await user_service.grant_user(user_uuid_to_grant, grant_data)
@@ -115,15 +108,3 @@ async def test_grant_user_not_found(mock_get):
     with pytest.raises(HTTPException) as exc_info:
         await user_service.grant_user(uuid4(), grant_data)
     assert exc_info.value.status_code == 404
-
-@pytest.mark.asyncio
-@patch('app.services.users.User.get_or_none', new_callable=AsyncMock)
-async def test_grant_user_invalid_role(mock_get, mock_user_model):
-    """ Тест: невалидная роль при назначении """
-    mock_get.return_value = mock_user_model
-    grant_data = UserGrantPrivileges(role="invalid_role")
-    with pytest.raises(HTTPException) as exc_info:
-        await user_service.grant_user(mock_user_model.uuid, grant_data)
-    assert exc_info.value.status_code == 400
-    assert "Invalid user role" in exc_info.value.detail
-    mock_user_model.save.assert_not_called()

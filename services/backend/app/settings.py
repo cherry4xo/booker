@@ -29,3 +29,5 @@ DEFAULT_MODERATOR_EMAIL = os.getenv("DEFAULT_MODERATOR_EMAIL", default="moderato
 DEFAULT_MODERATOR_PASSWORD = os.getenv("DEFAULT_MODERATOR_PASSWORD", default="password")
 
 LOGIN_URL = LOGIN_URL = f"http://0.0.0.0:8080/login/access-token"
+
+MODE = os.getenv("MODE", default="DEBUG")

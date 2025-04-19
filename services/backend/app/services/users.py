@@ -47,21 +47,18 @@ async def change_password(
 
 
 async def grant_user(user_uuid: UUID4, user_grant: UserGrantPrivileges):
-    # Assuming User.get_by_uuid is an async function that returns User or None/raises
-    user = await User.get_by_uuid(uuid=user_uuid) # Or User.get_or_none(uuid=user_uuid)
+    user = await User.get_by_uuid(uuid=user_uuid)
 
-    # FIX: Add check if user exists
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # FIX: Check the 'role' attribute of the schema against the list of enum values
     if user_grant.role not in UserRole.list():
         raise HTTPException(
             status_code=400,
             detail="Invalid user role"
         )
 
-    user.role = UserRole(user_grant.role) # Convert string value back to Enum member
+    user.role = UserRole(user_grant.role)
     await user.save()
     return user
 
@@ -71,32 +68,21 @@ async def update_profile(current_user: User, profile_data: UserUpdateProfile) ->
     Обновляет данные профиля пользователя (пока только telegram_id).
     Применяет только те поля, которые переданы в profile_data.
     """
-    # Получаем данные из схемы, исключая не установленные (None)
     update_data = profile_data.model_dump(exclude_unset=True)
 
     if not update_data:
-        # Если в запросе не было данных для обновления
-        # Можно вернуть пользователя без изменений или кинуть ошибку 400
         return current_user
-        # raise HTTPException(status_code=400, detail="Нет данных для обновления")
 
-    # Обновляем объект пользователя данными из словаря
     current_user.update_from_dict(update_data)
 
     try:
-        # Сохраняем изменения в БД
-        await current_user.save(update_fields=list(update_data.keys())) # Оптимизация: обновляем только измененные поля
+        await current_user.save(update_fields=list(update_data.keys()))
         print(f"Профиль пользователя {current_user.username} обновлен: {update_data}")
     except IntegrityError as e:
-        # Обработка ошибок уникальности, если в будущем добавим такие поля в UserUpdateProfile
         print(f"Ошибка целостности при обновлении профиля {current_user.username}: {e}")
-        # Пример: определить, какое поле вызвало конфликт, и вернуть ошибку 409
-        # if "unique_constraint_name" in str(e):
-        #     raise HTTPException(status_code=409, detail="Конфликт данных. Указанное значение уже используется.")
         raise HTTPException(status_code=500, detail="Ошибка базы данных при обновлении профиля.")
     except Exception as e:
         print(f"Неожиданная ошибка при обновлении профиля {current_user.username}: {e}")
         raise HTTPException(status_code=500, detail="Не удалось обновить профиль.")
 
-    # Возвращаем обновленный объект пользователя
     return current_user

@@ -12,3 +12,4 @@ email-validator
 bcrypt
 cryptography
 uvicorn
+prometheus-fastapi-instrumentator>=6.1.0
