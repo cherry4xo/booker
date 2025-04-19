@@ -31,7 +31,7 @@ main_app_lifespan = app.router.lifespan_context
 @asynccontextmanager
 async def lifespan_wrapper(app):
     await init(app)
-    await run_seeding()
+    # await run_seeding()
     async with main_app_lifespan(app) as maybe_state:
         yield maybe_state
 app.router.lifespan_context = lifespan_wrapper
