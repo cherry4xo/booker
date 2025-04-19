@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta, time
+from builtins import min as builtin_min
 from typing import List, Optional
+
 from fastapi import HTTPException, Depends
 from tortoise.exceptions import IntegrityError
 
@@ -15,28 +17,23 @@ async def check_auditorium_availability(
 ) -> bool:
     if end_dt <= start_dt:
         raise HTTPException(status_code=400, detail="Время окончания должно быть после времени начала.")
-
-    # Словарь для кэширования слотов по дню недели, чтобы избежать лишних запросов к БД
+    
     availability_slots_cache = {}
-
     current_check_dt = start_dt
+    
     while current_check_dt < end_dt:
         current_date = current_check_dt.date()
-        day_of_week = current_date.weekday() # 0 = Понедельник, 6 = Воскресенье
-
-        # Определяем конец текущего проверяемого сегмента: либо конец бронирования,
-        # либо начало следующего дня (полночь)
-        segment_end_for_date = min(end_dt, datetime.datetime.combine(current_date + datetime.timedelta(days=1), datetime.time.min, tzinfo=start_dt.tzinfo)) # Сохраняем TZ info
-
-        # Определяем временной интервал, который нужно проверить для *текущей даты*
+        day_of_week = current_date.weekday()
+        segment_end_for_date = builtin_min(end_dt, datetime.combine(current_date + timedelta(days=1), time(0, 0, 0), tzinfo=start_dt.tzinfo))
         check_start_time = current_check_dt.time()
-        # Если segment_end_for_date - это полночь, то конечное время для проверки - 23:59:59...
+        # ---> FIX: Use datetime.time explicitly <---
         check_end_time = segment_end_for_date.time() if segment_end_for_date.date() == current_date else datetime.time(23, 59, 59, 999999)
-        # Особый случай: если конец сегмента ровно в 00:00 следующего дня
-        if segment_end_for_date.time() == datetime.time(0,0) and segment_end_for_date > current_check_dt:
-             check_end_time = datetime.time(23, 59, 59, 999999) # Представляет конец дня для проверки
 
-        # Получаем слоты доступности для этого дня недели (из кэша или БД)
+        # ---> FIX: Use datetime.time explicitly <---
+        if segment_end_for_date.time() == datetime.time(0, 0) and segment_end_for_date > current_check_dt:
+        # Around line 37 (assignment inside if)
+            check_end_time = datetime.time(23, 59, 59, 999999)
+
         if day_of_week not in availability_slots_cache:
             slots_for_day = await AvailabilitySlot.filter(
                 auditorium_id=auditorium_uuid,
@@ -47,43 +44,52 @@ async def check_auditorium_availability(
             slots_for_day = availability_slots_cache[day_of_week]
 
         if not slots_for_day:
-             # Если на этот день вообще нет слотов, а бронь его затрагивает
-             raise HTTPException(
+            raise HTTPException(
                 status_code=400,
                 detail=(f"Аудитория недоступна в указанный интервал. "
                         f"Нет расписания доступности на {current_date.strftime('%A, %Y-%m-%d')}.")
-             )
+            )
 
-        time_covered_until = check_start_time # С какого времени интервал уже покрыт
+        time_covered_until = check_start_time
         segment_fully_covered = False
 
+        # ---> FIX: Use datetime.time explicitly <---
         if check_start_time == check_end_time and check_start_time == datetime.time(0, 0):
              segment_fully_covered = True
         else:
-            sorted_slots = sorted(slots_for_day, key=lambda s: s.start_time) # Убедимся, что отсортированы
+            sorted_slots = sorted(slots_for_day, key=lambda s: s.start_time)
             for slot in sorted_slots:
+                # ---> FIX: Use datetime.time explicitly <---
                 effective_slot_end = slot.end_time if slot.end_time != datetime.time(0, 0) else datetime.time(23, 59, 59, 999999)
 
-                if slot.start_time > time_covered_until:
-                    break
-
+                # --- Minor logic refinement suggestion ---
+                # Check if the current slot can even cover the start time needed
                 if slot.start_time <= time_covered_until and effective_slot_end > time_covered_until:
+                    # If the slot starts before or at the time we need coverage for,
+                    # and ends after it, it extends our coverage.
                     time_covered_until = max(time_covered_until, effective_slot_end)
+
+                # Optimization: If the next slot starts after the required end time, we can't be covered.
+                # (This assumes sorted_slots)
+                if slot.start_time > check_end_time:
+                    break # Gaps cannot be filled by later slots
 
                 if time_covered_until >= check_end_time:
                     segment_fully_covered = True
                     break
+            # --- End refinement suggestion ---
 
-            if not segment_fully_covered:
-                 auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
-                 identifier = auditorium.identifier if auditorium else str(auditorium_uuid)
-                 raise HTTPException(
-                     status_code=400,
-                     detail=(f"Аудитория '{identifier}' недоступна в запрошенный временной интервал. "
-                             f"Проблема в {current_date.strftime('%A, %Y-%m-%d')} "
-                             f"между {check_start_time.strftime('%H:%M')} и {check_end_time.strftime('%H:%M:%S')}. "
-                             f"Проверьте расписание доступности.")
-                 )
+        if not segment_fully_covered:
+            auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
+            identifier = auditorium.identifier if auditorium else str(auditorium_uuid)
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Аудитория '{identifier}' недоступна в запрошенный временной интервал. "
+                        f"Проблема в {current_date.strftime('%A, %Y-%m-%d')} "
+                        # Show the segment that failed coverage
+                        f"между {check_start_time.strftime('%H:%M:%S')} и {check_end_time.strftime('%H:%M:%S')}. "
+                        f"Проверьте расписание доступности.")
+            )
 
         current_check_dt = segment_end_for_date
 
@@ -92,7 +98,7 @@ async def check_auditorium_availability(
 
 async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Optional[Booking]: # Возвращаем модель
     """ Получает бронирование по UUID с проверкой прав """
-    booking = await Booking.get_or_none(uuid=booking_uuid).prefetch_related('broker', 'auditorium')
+    booking = await Booking.filter(uuid=booking_uuid).prefetch_related('broker', 'auditorium').first()
 
     if not booking:
         return None
@@ -108,8 +114,8 @@ async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Option
 
 async def check_booking_overlap(
     auditorium_uuid: UUID4,
-    start: datetime.datetime,
-    end: datetime.datetime,
+    start: datetime,
+    end: datetime,
     exclude_booking_uuid: Optional[UUID4] = None
 ) -> bool:
     """
@@ -186,7 +192,7 @@ async def update_booking(
 ) -> Booking: # Возвращаем модель
     """ Обновляет существующее бронирование """
     # Используем стандартный метод Tortoise
-    booking = await Booking.get_or_none(uuid=booking_uuid).prefetch_related('broker', 'auditorium')
+    booking = await Booking.filter(uuid=booking_uuid).prefetch_related('broker', 'auditorium').first()
 
     if not booking:
         raise HTTPException(status_code=404, detail="Бронирование не найдено")
@@ -266,11 +272,11 @@ async def get_bookings(
         query = query.filter(auditorium_id=auditorium_uuid) # Исправлено на _id
 
     if start_date:
-        start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+        start_datetime = datetime.combine(start_date, datetime.time.min)
         # Добавить обработку TZ если необходимо
         query = query.filter(start_time__gte=start_datetime)
     if end_date:
-        end_datetime = datetime.datetime.combine(end_date, datetime.time.max)
+        end_datetime = datetime.combine(end_date, datetime.time.max)
         # Добавить обработку TZ если необходимо
         query = query.filter(end_time__lte=end_datetime)
 

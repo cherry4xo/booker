@@ -27,3 +27,5 @@ CORS_ALLOW_HEADERS = ["*"]
 DEFAULT_MODERATOR_USERNAME = os.getenv("DEFAULT_MODERATOR_USERNAME", default="moderator")
 DEFAULT_MODERATOR_EMAIL = os.getenv("DEFAULT_MODERATOR_EMAIL", default="moderator@example.com")
 DEFAULT_MODERATOR_PASSWORD = os.getenv("DEFAULT_MODERATOR_PASSWORD", default="password")
+
+LOGIN_URL = LOGIN_URL = f"http://auth:8080/login/access-token"

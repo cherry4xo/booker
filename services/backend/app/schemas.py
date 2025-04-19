@@ -155,3 +155,8 @@ class UpdateBooking(BaseModel):
 
 class DeleteBooking(BaseModel):
     uuid: UUID4
+
+
+class JWTTokenPayload(BaseModel):
+    user_uuid: UUID4 = None
+    token_kind: str = None

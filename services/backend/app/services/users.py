@@ -1,4 +1,5 @@
 from fastapi import HTTPException, Depends
+from pydantic import UUID4
 
 from app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges
 from app.models import User, UserRole
@@ -43,15 +44,21 @@ async def change_password(
     await current_user.save()
 
 
-async def grant_user(user_grant: UserGrantPrivileges):
-    user = await User.get_by_uuid(uuid=user_grant.uuid)
-    if user_grant not in UserRole.list():
+async def grant_user(user_uuid: UUID4, user_grant: UserGrantPrivileges):
+    # Assuming User.get_by_uuid is an async function that returns User or None/raises
+    user = await User.get_by_uuid(uuid=user_uuid) # Or User.get_or_none(uuid=user_uuid)
+
+    # FIX: Add check if user exists
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # FIX: Check the 'role' attribute of the schema against the list of enum values
+    if user_grant.role not in UserRole.list():
         raise HTTPException(
             status_code=400,
             detail="Invalid user role"
         )
-    
-    user.role = UserRole(user_grant.role)
-    await user.save()
 
+    user.role = UserRole(user_grant.role) # Convert string value back to Enum member
+    await user.save()
     return user

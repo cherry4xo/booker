@@ -16,25 +16,73 @@ async def check_availability_slot_overlap(
     exclude_slot_uuid: Optional[UUID4] = None
 ) -> bool:
     """ Проверяет наложение нового или обновляемого слота с существующими """
-    # Корректируем время 00:00 для запроса
-    db_end_time = time(23, 59, 59, 999999) if end_time == time(0,0) else end_time
-    db_start_time = start_time
+    # --- Workaround for SQLite: Convert times to ISO strings ---
+    start_time_str = start_time.isoformat()
+    # Handle midnight end time for comparison logic
+    # If end_time is 00:00, it means "up to the end of the day"
+    is_end_midnight = (end_time == time(0, 0))
+    end_time_str = time(23, 59, 59, 999999).isoformat() if is_end_midnight else end_time.isoformat()
+    midnight_str = time(0, 0).isoformat()
+    # --- End Workaround ---
 
+    # Build the query using string comparisons
+    # Overlap condition: (Slot Start < My End) AND (Slot End > My Start)
+    # Needs careful handling of midnight representation in DB vs Python
+    # Assuming TimeField stores as TEXT 'HH:MM:SS.ffffff' in SQLite
     query = AvailabilitySlot.filter(
-        Q(start_time__lt=db_end_time) &
-        (Q(end_time__gt=db_start_time) | Q(end_time=time(0,0))), # Заканчивается после начала ИЛИ в полночь
+        auditorium_id=auditorium_uuid,
+        day_of_week=day_of_week,
+        # Slot starts before the new slot ends
+        start_time__lt=end_time_str,
+        # AND (Slot ends after the new slot starts OR Slot ends exactly at midnight represented differently)
+        # This part is tricky with string comparison and midnight.
+        # A simpler overlap check might be needed if this gets too complex.
+        # Let's try the Tortoise Q objects first, maybe it handles strings better.
+    )
+
+    # Refined Q object approach (hoping Tortoise handles string comparison correctly)
+    query = AvailabilitySlot.filter(
         auditorium_id=auditorium_uuid,
         day_of_week=day_of_week,
     )
-
-    # Особая обработка для start_time = 00:00, чтобы не пересекалось с end_time = 00:00
-    if db_start_time == time(0,0):
-        query = query.exclude(end_time=time(0,0)) # Не считаем пересечением, если старый заканчивается в полночь, а новый начинается
-
+    # Exclude the slot being updated
     if exclude_slot_uuid:
         query = query.exclude(uuid=exclude_slot_uuid)
 
+    # Core overlap logic: Existing Slot Start < New End AND Existing Slot End > New Start
+    # Handle the "End at Midnight" case carefully.
+    # Case 1: Existing slot does NOT end at midnight (stored as '23:59:59...')
+    q1 = Q(start_time__lt=end_time_str) & Q(end_time__gt=start_time_str) & ~Q(end_time=midnight_str)
+
+    # Case 2: Existing slot ENDS at midnight (stored as '00:00:00')
+    # It overlaps if the New slot starts before midnight (i.e., starts on the same day)
+    q2 = Q(end_time=midnight_str) & Q(start_time__lt=end_time_str) # Should overlap if new slot starts before 23:59..
+
+    # Case 3: Special handling if the NEW slot ends at midnight ('00:00:00')
+    if is_end_midnight:
+        # Overlaps if an existing slot starts anytime on this day
+        q_new_ends_midnight = Q(start_time__gte=start_time_str) # Existing starts after or at new start
+    else:
+        # Standard overlap check if new slot ends normally
+        q_new_ends_midnight = Q(start_time__lt=end_time_str) & (Q(end_time__gt=start_time_str) | Q(end_time=midnight_str))
+
+
+    # Combine conditions - this logic might need refinement based on exact storage/comparison behavior
+    # Simplified: An existing slot overlaps if its interval intersects the new interval.
+    # (ExistingStart < NewEnd) and (ExistingEnd > NewStart)
+    # Tortoise might handle time string comparisons lexicographically, which works for HH:MM:SS format.
+    query = query.filter(
+        Q(start_time__lt = end_time_str) &
+        (Q(end_time__gt = start_time_str) | Q(end_time = midnight_str)) # Allow end_time=00:00 to mean "until end of day"
+    )
+     # Exclude cases where new starts at 00:00 and old ends at 00:00 (no overlap)
+    if start_time == time(0,0):
+         query = query.exclude(end_time=midnight_str)
+
+
+    # Use .exists()
     overlap_exists = await query.exists()
+
     if overlap_exists:
         raise HTTPException(
             status_code=409,
@@ -49,17 +97,25 @@ async def create_availability(availability_model: CreateAvailability) -> Availab
     if not auditorium:
         raise HTTPException(status_code=404, detail="Auditorium not found")
 
-    # Проверка наложения
+    # Проверка наложения (using the existing check function)
     await check_availability_slot_overlap(
-        auditorium_uuid=availability_model.auditorium,
+        auditorium_uuid=availability_model.auditorium, # Check uses UUID
         day_of_week=availability_model.day_of_week,
         start_time=availability_model.start_time,
         end_time=availability_model.end_time
     )
 
-    # Создаем объект напрямую
-    availability = AvailabilitySlot(**availability_model.model_dump())
+    # FIX: Create slot instance passing the fetched auditorium object
+    slot_data_dict = availability_model.model_dump()
+    auditorium_uuid = slot_data_dict.pop('auditorium') # Keep the uuid
+
+    availability = AvailabilitySlot(
+        auditorium_id=auditorium.uuid, # Pass the ID
+        **slot_data_dict # Pass remaining fields
+    )
     await availability.save()
+    # Fetch related if needed after save
+    await availability.fetch_related('auditorium')
     return availability
 
 
