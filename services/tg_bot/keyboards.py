@@ -2,7 +2,7 @@ from aiogram import types
 import values
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
-import values
+from values import but_equipment_filter, but_capacity_aud
 
 
 def create_start_keyboard() -> ReplyKeyboardMarkup:
@@ -30,4 +30,14 @@ def create_inline_keyboard_diff_len(count: int) -> InlineKeyboardMarkup:
         keyboard_buttons.append(row)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    return keyboard
+
+
+def create_inline_filtered_keyboard() -> InlineKeyboardMarkup:
+    keyboard_button = []
+    row = []
+    row.append(InlineKeyboardButton(text=but_equipment_filter, callback_data=f"filter_equipment"))
+    row.append(InlineKeyboardButton(text=but_capacity_aud, callback_data=f"filter_capacity"))
+    keyboard_button.append(row)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_button)
     return keyboard

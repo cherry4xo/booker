@@ -8,8 +8,9 @@ from aerich import Command, exceptions as aerich_exceptions
 from fastapi import FastAPI
 
 from app import settings
-from app.models import User, UserRole
-from app.schemas import UserCreate
+from app import enums
+from app import models
+from app import schemas
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -106,21 +107,21 @@ async def create_default_moderator_user() -> None:
     logger.info(f"Checking for default moderator user: {settings.DEFAULT_MODERATOR_USERNAME}")
 
     try:
-        existing_user = await User.get_by_username(settings.DEFAULT_MODERATOR_USERNAME)
+        existing_user = await models.User.get_by_username(settings.DEFAULT_MODERATOR_USERNAME)
         if existing_user:
             logger.info(f"Default moderator '{settings.DEFAULT_MODERATOR_USERNAME}' already exists.")
-            if existing_user.role != UserRole.MODERATOR:
+            if existing_user.role != enums.UserRole.MODERATOR:
                 logger.warning(f"User '{settings.DEFAULT_MODERATOR_USERNAME}' exists but is not a MODERATOR. Updating role.")
-                existing_user.role = UserRole.MODERATOR
+                existing_user.role = enums.UserRole.MODERATOR
                 await existing_user.save(update_fields=['role', 'updated_at']) # Explicitly save role change
             return existing_user
         else:
             logger.info(f"Default moderator '{settings.DEFAULT_MODERATOR_USERNAME}' not found. Creating...")
-            user_model = UserCreate(username=settings.DEFAULT_MODERATOR_USERNAME, 
+            user_model = schemas.UserCreate(username=settings.DEFAULT_MODERATOR_USERNAME,
                                     password=settings.DEFAULT_MODERATOR_PASSWORD, 
                                     email=settings.DEFAULT_MODERATOR_EMAIL)
-            new_user = await User.create(user_model)
-            new_user.role = UserRole.MODERATOR
+            new_user = await models.User.create(user_model)
+            new_user.role = enums.UserRole.MODERATOR
             await new_user.save()
     except Exception as e:
         logger.error(f"Failed to create default moderator user: {e}", exc_info=True)

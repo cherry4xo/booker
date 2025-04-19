@@ -13,3 +13,4 @@ email-validator
 bcrypt
 cryptography
 uvicorn
+Tortoise
