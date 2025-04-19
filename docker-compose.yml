@@ -16,6 +16,13 @@ services:
       - "8081:8080"
     links:
       - users-postgres
+  tg_bot:
+    build: ./services/tg_bot
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    links:
+      - users-postgres
   users-postgres:
     image: postgres:alpine
     restart: unless-stopped

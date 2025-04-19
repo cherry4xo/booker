@@ -1,0 +1,15 @@
+aerich
+aiogram
+fastapi
+tortoise-orm
+tortoise-orm[asyncpg]
+PyJWT
+redis
+pytest
+python-dotenv
+passlib
+python-multipart
+email-validator
+bcrypt
+cryptography
+uvicorn
