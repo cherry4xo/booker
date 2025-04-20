@@ -1,14 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
   "__requires": [
     { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "8.0.0" },
     { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
@@ -19,7 +9,7 @@
     { "type": "panel", "id": "bargauge", "name": "Bar gauge", "version": "" },
     { "type": "panel", "id": "histogram", "name": "Histogram", "version": "" }
   ],
-  "annotations": {  },
+  "annotations": {},
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -36,7 +26,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": "DS_PROMETHEUS",
       "fieldConfig": {
         "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 80 }] }, "unit": "reqps" },
         "overrides": []
@@ -53,7 +43,7 @@
       "description": "Total requests per second across selected services. Requires a FastAPI instrumentor."
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": "DS_PROMETHEUS",
       "fieldConfig": {
         "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 200 }, { "color": "red", "value": 500 }] }, "unit": "ms" },
         "overrides": []
@@ -69,10 +59,10 @@
       "type": "stat",
       "description": "95th percentile request latency in milliseconds. Requires a FastAPI instrumentor."
     },
-     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+    {
+      "datasource": "DS_PROMETHEUS",
       "fieldConfig": {
-        "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] }, "unit": "percentunit" }, 
+        "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] }, "unit": "percentunit" },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
@@ -86,10 +76,10 @@
       "type": "stat",
       "description": "Percentage of requests resulting in a 5xx error. Requires a FastAPI instrumentor."
     },
-     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+    {
+      "datasource": "DS_PROMETHEUS",
       "fieldConfig": {
-        "defaults": { "color": { "mode": "palette-classic" }, "custom": { }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": {}, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
@@ -102,7 +92,6 @@
       "type": "timeseries",
       "description": "Rate of requests broken down by HTTP status code. Requires a FastAPI instrumentor."
     },
-
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
@@ -111,27 +100,25 @@
       "title": "Backend Service: Users & Bookings",
       "type": "row"
     },
-    { "id": 1, "gridPos": { "h": 6, "w": 4, "x": 0, "y": 10 }, "type": "stat", "title": "User Registrations (Total)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum(backend_user_registrations_total{job=\"backend\"})", "refId": "A" }] },
-    { "id": 2, "gridPos": { "h": 6, "w": 5, "x": 4, "y": 10 }, "type": "stat", "title": "Password Changes (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum(rate(backend_user_password_changes_total{job=\"backend\", status=\"success\"}[5m]))", "refId": "A", "legendFormat": "Success" }, { "expr": "sum(rate(backend_user_password_changes_total{job=\"backend\", status=\"failure\"}[5m]))", "refId": "B", "legendFormat": "Failure" }], "options": {"orientation": "horizontal"} },
-    { "id": 3, "gridPos": { "h": 6, "w": 5, "x": 9, "y": 10 }, "type": "stat", "title": "Role Changes (Total)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum(backend_user_role_changes_total{job=\"backend\"})", "refId": "A" }] },
-    { "id": 10, "gridPos": { "h": 8, "w": 10, "x": 14, "y": 10 }, "type": "timeseries", "title": "Bookings Created/Cancelled (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "rate(backend_bookings_created_total{job=\"backend\"}[5m])", "refId": "A", "legendFormat": "Created" }, { "expr": "rate(backend_bookings_cancelled_total{job=\"backend\"}[5m])", "refId": "B", "legendFormat": "Cancelled" }] },
-    { "id": 11, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }, "type": "timeseries", "title": "Booking Creation Failures (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum by(reason) (rate(backend_bookings_creation_failures_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{reason}}" }] },
-    { "id": 12, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }, "type": "timeseries", "title": "Booking Duration (Avg, P95 - hours)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum(rate(backend_booking_duration_hours_sum{job=\"backend\"}[5m])) / sum(rate(backend_booking_duration_hours_count{job=\"backend\"}[5m]))", "refId": "AVG", "legendFormat": "Average" }, { "expr": "histogram_quantile(0.95, sum(rate(backend_booking_duration_hours_bucket{job=\"backend\"}[5m])) by (le))", "refId": "P95", "legendFormat": "P95" }], "fieldConfig": {"defaults": {"unit": "hour"}}},
-
+    { "id": 1, "gridPos": { "h": 6, "w": 4, "x": 0, "y": 10 }, "type": "stat", "title": "User Registrations (Total)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum(backend_user_registrations_total{job=\"backend\"})", "refId": "A" }] },
+    { "id": 2, "gridPos": { "h": 6, "w": 5, "x": 4, "y": 10 }, "type": "stat", "title": "Password Changes (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum(rate(backend_user_password_changes_total{job=\"backend\", status=\"success\"}[5m]))", "refId": "A", "legendFormat": "Success" }, { "expr": "sum(rate(backend_user_password_changes_total{job=\"backend\", status=\"failure\"}[5m]))", "refId": "B", "legendFormat": "Failure" }], "options": {"orientation": "horizontal"} },
+    { "id": 3, "gridPos": { "h": 6, "w": 5, "x": 9, "y": 10 }, "type": "stat", "title": "Role Changes (Total)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum(backend_user_role_changes_total{job=\"backend\"})", "refId": "A" }] },
+    { "id": 10, "gridPos": { "h": 8, "w": 10, "x": 14, "y": 10 }, "type": "timeseries", "title": "Bookings Created/Cancelled (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "rate(backend_bookings_created_total{job=\"backend\"}[5m])", "refId": "A", "legendFormat": "Created" }, { "expr": "rate(backend_bookings_cancelled_total{job=\"backend\"}[5m])", "refId": "B", "legendFormat": "Cancelled" }] },
+    { "id": 11, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }, "type": "timeseries", "title": "Booking Creation Failures (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum by(reason) (rate(backend_bookings_creation_failures_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{reason}}" }] },
+    { "id": 12, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }, "type": "timeseries", "title": "Booking Duration (Avg, P95 - hours)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum(rate(backend_booking_duration_hours_sum{job=\"backend\"}[5m])) / sum(rate(backend_booking_duration_hours_count{job=\"backend\"}[5m]))", "refId": "AVG", "legendFormat": "Average" }, { "expr": "histogram_quantile(0.95, sum(rate(backend_booking_duration_hours_bucket{job=\"backend\"}[5m])) by (le))", "refId": "P95", "legendFormat": "P95" }], "fieldConfig": {"defaults": {"unit": "hour"}} },
     {
-      "collapsed": true, 
+      "collapsed": true,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
       "id": 300,
       "panels": [],
       "title": "Backend Service: Resources & Views",
       "type": "row"
     },
-    { "id": 20, "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 }, "type": "timeseries", "title": "Auditorium Ops (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum by(operation) (rate(backend_auditoriums_managed_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }], "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}}},
-    { "id": 301, "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 }, "type": "timeseries", "title": "Equipment Ops (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum by(operation) (rate(backend_equipment_managed_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }], "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}}},
-    { "id": 302, "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 }, "type": "timeseries", "title": "Availability Slot Ops (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum by(operation) (rate(backend_availability_slots_managed_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }], "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}}},
-    { "id": 303, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 }, "type": "timeseries", "title": "Calendar Views (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "rate(backend_calendar_views_total{job=\"backend\"}[5m])", "refId": "A" }]},
-    { "id": 304, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 }, "type": "timeseries", "title": "Auditorium Searches (Rate 5m)", "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "expr": "sum by (filtered_by) (rate(backend_auditorium_searches_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{filtered_by}}" }]},
-
+    { "id": 20, "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 }, "type": "timeseries", "title": "Auditorium Ops (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum by(operation) (rate(backend_auditoriums_managed_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }], "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}} },
+    { "id": 301, "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 }, "type": "timeseries", "title": "Equipment Ops (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum by(operation) (rate(backend_equipment_managed_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }], "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}} },
+    { "id": 302, "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 }, "type": "timeseries", "title": "Availability Slot Ops (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum by(operation) (rate(backend_availability_slots_managed_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }], "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}} },
+    { "id": 303, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 }, "type": "timeseries", "title": "Calendar Views (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "rate(backend_calendar_views_total{job=\"backend\"}[5m])", "refId": "A" }] },
+    { "id": 304, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 }, "type": "timeseries", "title": "Auditorium Searches (Rate 5m)", "datasource": "DS_PROMETHEUS", "targets": [{ "expr": "sum by (filtered_by) (rate(backend_auditorium_searches_total{job=\"backend\"}[5m]))", "refId": "A", "legendFormat": "{{filtered_by}}" }] },
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
@@ -145,11 +132,11 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 42 },
       "type": "timeseries",
       "title": "Logins (Rate 5m)",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": "DS_PROMETHEUS",
       "targets": [
         { "expr": "sum by (status) (rate(auth_logins_total{job=\"auth\"}[5m]))", "refId": "A", "legendFormat": "{{status}}" }
       ],
-      "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}}, 
+      "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}},
       "description": "Rate of login attempts (success/failure). Adapt metric name 'auth_logins_total'."
     },
     {
@@ -157,26 +144,25 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 42 },
       "type": "timeseries",
       "title": "Token Operations (Rate 5m)",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": "DS_PROMETHEUS",
       "targets": [
-        { "expr": "sum by (operation) (rate(auth_token_operations_total{job=\"auth\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" } 
+        { "expr": "sum by (operation) (rate(auth_token_operations_total{job=\"auth\"}[5m]))", "refId": "A", "legendFormat": "{{operation}}" }
       ],
-       "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}}, 
-       "description": "Rate of token operations (generation, refresh, validation). Adapt metric name 'auth_token_operations_total'."
+      "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}},
+      "description": "Rate of token operations (generation, refresh, validation). Adapt metric name 'auth_token_operations_total'."
     },
-     {
+    {
       "id": 403,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 42 },
       "type": "timeseries",
       "title": "Token Validation Latency (P95)",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": "DS_PROMETHEUS",
       "targets": [
         { "expr": "histogram_quantile(0.95, sum(rate(auth_token_validation_seconds_bucket{job=\"auth\"}[5m])) by (le)) * 1000", "refId": "A", "legendFormat": "P95 Latency" }
       ],
-       "fieldConfig": {"defaults": {"unit": "ms"}},
-       "description": "95th percentile latency for token validation. Adapt metric name 'auth_token_validation_seconds'."
+      "fieldConfig": {"defaults": {"unit": "ms"}},
+      "description": "95th percentile latency for token validation. Adapt metric name 'auth_token_validation_seconds'."
     }
-
   ],
   "refresh": "15s",
   "schemaVersion": 36,
@@ -184,36 +170,36 @@
   "tags": ["fastapi", "app", "backend", "auth"],
   "templating": {
     "list": [
-       {
-         "current": { 
-           "selected": true,
-           "text": ["backend", "auth"], 
-           "value": ["backend", "auth"]
-         },
-         "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-         "definition": "label_values(up, job)", 
-         "description": "Select the service(s) to display metrics for.",
-         "error": null,
-         "hide": 0, 
-         "includeAll": true, 
-         "label": "Service",
-         "multi": true, 
-         "name": "job", 
-         "options": [],
-         "query": "label_values(up, job)",
-         "refresh": 1, 
-         "regex": "",
-         "skipUrlSync": false,
-         "sort": 0, 
-         "type": "query"
-       }
+      {
+        "current": {
+          "selected": true,
+          "text": ["backend", "auth"],
+          "value": ["backend", "auth"]
+        },
+        "datasource": "DS_PROMETHEUS",
+        "definition": "label_values(up, job)",
+        "description": "Select the service(s) to display metrics for.",
+        "error": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "job",
+        "options": [],
+        "query": "label_values(up, job)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "FastAPI Overview (Backend & Auth)",
-  "uid": "fastapi-overview-combined", 
-  "version": 2, 
+  "uid": "fastapi-overview-combined",
+  "version": 3,
   "weekStart": ""
 }
