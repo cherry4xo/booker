@@ -8,9 +8,9 @@ from tortoise import fields
 from tortoise.models import Model
 from tortoise.exceptions import DoesNotExist
 
-from utils import password
-from schemas import UserCreate, CreateEquipment, CreateAuditorium, CreateAvailability, CreateBooking
-from enums import UserRole
+from app.utils import password
+from app.schemas import UserCreate, CreateEquipment, CreateAuditorium, CreateAvailability, CreateBooking
+from app.enums import UserRole
 
 class BaseModel(Model):
     async def to_dict(self):
@@ -163,6 +163,8 @@ class AvailabilitySlot(BaseModel):
         except DoesNotExist:
             return None
 
+    #TODO Сделать форматирование  вывода
+
     class Meta:
         table = "availability_slots"
         unique_together = (("auditorium", "day_of_week", "start_time"), ("auditorium", "day_of_week", "end_time"))
@@ -171,6 +173,7 @@ class AvailabilitySlot(BaseModel):
     def __str__(self):
         days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         return f"Aud. {self.auditorium_id}: {days[self.day_of_week]} {self.start_time}-{self.end_time}"
+
 
 
 class Auditorium(BaseModel):
@@ -196,6 +199,15 @@ class Auditorium(BaseModel):
     async def get_by_id(cls, uuid: str) -> Optional["Auditorium"]:
         try:
             query = cls.get_or_none(uuid=uuid)
+            auditorium = await query
+            return auditorium
+        except DoesNotExist:
+            return None
+
+    @classmethod
+    async def get_by_name(cls, name: str) -> Optional["Auditorium"]:
+        try:
+            query = cls.get_or_none(identifier=name)
             auditorium = await query
             return auditorium
         except DoesNotExist:
