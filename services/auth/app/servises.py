@@ -8,7 +8,10 @@ from app.models import User
 from app.utils.contrib import authenticate, validate_refresh_token, reusable_oauth2, refresh_oauth2, get_current_user
 from app.utils.jwt import create_access_token, create_refresh_token
 from app import settings
+from app.logger import log_calls
 
+
+@log_calls
 async def get_access_token(credentials: OAuth2PasswordRequestForm = Depends()):
     credentials = CredentialsSchema(email=credentials.username, password=credentials.password)
     user = await authenticate(credentials=credentials)
@@ -29,6 +32,7 @@ async def get_access_token(credentials: OAuth2PasswordRequestForm = Depends()):
     }
 
 
+@log_calls
 async def login_refresh_token(credentials: OAuth2PasswordRequestForm = Depends()):
     credentials = CredentialsSchema(email=credentials.username, password=credentials.password)
     user = await authenticate(credentials=credentials)
@@ -46,6 +50,7 @@ async def login_refresh_token(credentials: OAuth2PasswordRequestForm = Depends()
     }
 
 
+@log_calls
 async def refresh_token(
     token: RefreshToken
 ):
@@ -65,6 +70,7 @@ async def refresh_token(
     }
 
 
+@log_calls
 async def validate_access_token(
     token: str = Security(reusable_oauth2)
 ):

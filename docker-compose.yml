@@ -16,6 +16,8 @@ services:
       - "8080:8080"
     depends_on:
       - users-postgres
+    volumes:
+      - ./services/auth/logs:/usr/src/users/logs
     networks:
       - booker-net
   backend:
@@ -32,6 +34,8 @@ services:
       - "8081:8080"
     depends_on:
       - users-postgres
+    volumes:
+      - ./services/backend/logs:/usr/src/users/logs
     networks:
       - booker-net
   users-postgres:

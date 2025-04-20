@@ -13,6 +13,7 @@ from app.routes.availability import router as availability_router
 from app.routes.booking import router as booking_router
 from app.routes.equipment import router as equipment_router
 from app.routes.users import router as users_router
+from app.logger import setup_logging, LoggingMiddleware
 
 
 def init_middlewares(app: FastAPI):
@@ -23,8 +24,10 @@ def init_middlewares(app: FastAPI):
         allow_methods=settings.CORS_ALLOW_METHODS,
         allow_headers=settings.CORS_ALLOW_HEADERS
     )
+    app.add_middleware(LoggingMiddleware)
+    
 
-
+setup_logging("backend-service")
 app = FastAPI()
 instrumentator = Instrumentator().instrument(app)
 

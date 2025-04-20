@@ -4,15 +4,15 @@ from typing import List, Optional
 
 from fastapi import HTTPException, Depends, Query
 from tortoise.exceptions import IntegrityError
+from pydantic import UUID4
 
 from app.schemas import CreateBooking, GetBooking, UpdateBooking, DeleteBooking
 from app.models import Auditorium, AvailabilitySlot, User, Booking
 from app.enums import UserRole
-from pydantic import UUID4
-
-from app.utils.contrib import get_current_user
+from app.logger import log_calls
 
 
+@log_calls
 async def check_auditorium_availability(
     auditorium_uuid: UUID4,
     start_dt: datetime,
@@ -87,6 +87,7 @@ async def check_auditorium_availability(
     return True
 
 
+@log_calls
 async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Optional[Booking]:
     """ Получает бронирование по UUID с проверкой прав """
     booking = await Booking.filter(uuid=booking_uuid).prefetch_related('broker', 'auditorium').first()
@@ -102,6 +103,7 @@ async def get_booking_by_uuid(booking_uuid: UUID4, current_user: User) -> Option
     return booking
 
 
+@log_calls
 async def check_booking_overlap(
     auditorium_uuid: UUID4,
     start: datetime,
@@ -132,6 +134,7 @@ async def check_booking_overlap(
     return True
 
 
+@log_calls
 async def create_booking(booking_model: CreateBooking, current_user: User) -> Booking:
     """ Создает новое бронирование """
     auditorium = await Auditorium.get_or_none(uuid=booking_model.auditorium)
@@ -171,6 +174,7 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Bo
         )
     
     
+@log_calls
 async def update_booking(
     booking_uuid: UUID4,
     booking_update_data: UpdateBooking,
@@ -225,6 +229,8 @@ async def update_booking(
     await booking.fetch_related('broker', 'auditorium')
     return booking
 
+
+@log_calls
 async def get_bookings(
     current_user: User,
     auditorium_uuid: Optional[UUID4] = None,
@@ -256,6 +262,7 @@ async def get_bookings(
     return bookings
 
 
+@log_calls
 async def delete_booking(booking_uuid: UUID4, current_user: User) -> bool:
     """ Удаляет бронирование по UUID с проверкой прав """
     booking = await Booking.get_or_none(uuid=booking_uuid)
@@ -272,6 +279,7 @@ async def delete_booking(booking_uuid: UUID4, current_user: User) -> bool:
          raise HTTPException(status_code=500, detail=f"Не удалось удалить бронирование.")
 
 
+@log_calls
 async def get_bookings_for_calendar(
     auditorium_uuid: UUID4,
     start_date: date,
@@ -294,6 +302,7 @@ async def get_bookings_for_calendar(
     return bookings
 
 
+@log_calls
 async def get_my_bookings(
     current_user: User,
     auditorium_uuid: Optional[UUID4] = None,

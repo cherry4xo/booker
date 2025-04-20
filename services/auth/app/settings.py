@@ -30,3 +30,5 @@ CORS_ORIGINS = ["*"]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["*"]
 CORS_ALLOW_HEADERS = ["*"]
+
+MODE = os.getenv("MODE", default="DEBUG")

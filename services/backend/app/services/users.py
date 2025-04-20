@@ -1,14 +1,16 @@
 from fastapi import HTTPException, Depends
 from pydantic import UUID4
+from tortoise.exceptions import IntegrityError
 
 from app.schemas import UserCreate, UserChangePasswordIn, UserGrantPrivileges, UserUpdateProfile
 from app.models import User
 from app.enums import UserRole
 from app.utils import password
 from app.utils.contrib import get_current_user
-from tortoise.exceptions import IntegrityError
+from app.logger import log_calls
 
 
+@log_calls
 async def create_user(user: UserCreate):
     user_db = await User.get_by_email(email=user.email)
     
@@ -30,6 +32,7 @@ async def create_user(user: UserCreate):
     return user_db
 
 
+@log_calls
 async def change_password(
     change_password_in: UserChangePasswordIn, 
     current_user: User = Depends(get_current_user)
@@ -46,6 +49,7 @@ async def change_password(
     await current_user.save()
 
 
+@log_calls
 async def grant_user(user_uuid: UUID4, user_grant: UserGrantPrivileges):
     user = await User.get_by_uuid(uuid=user_uuid)
 
@@ -63,6 +67,7 @@ async def grant_user(user_uuid: UUID4, user_grant: UserGrantPrivileges):
     return user
 
 
+@log_calls
 async def update_profile(current_user: User, profile_data: UserUpdateProfile) -> User:
     """
     Обновляет данные профиля пользователя (пока только telegram_id).
