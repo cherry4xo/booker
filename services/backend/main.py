@@ -28,7 +28,7 @@ def init_middlewares(app: FastAPI):
     
 
 setup_logging("backend-service")
-app = FastAPI()
+app = FastAPI(root_path="/backend")
 instrumentator = Instrumentator().instrument(app)
 
 

@@ -23,7 +23,7 @@ def init_middlewares(app: FastAPI):
 
 
 setup_logging("auth-service")
-app = FastAPI()
+app = FastAPI(root_path="/auth")
 instrumentator = Instrumentator().instrument(app)
 
 main_app_lifespan = app.router.lifespan_context
