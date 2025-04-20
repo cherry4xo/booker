@@ -2,12 +2,16 @@ from datetime import time
 from typing import List, Optional
 from fastapi import HTTPException, Depends
 from tortoise.expressions import Q
+from pydantic import UUID4
 
 from app.schemas import CreateAvailability, GetAvailability, UpdateAvailability, DeleteAvailability
 from app.models import Auditorium, AvailabilitySlot
-from pydantic import UUID4
+from app.logger import log_calls
+
+from app import metrics
 
 
+@log_calls
 async def check_availability_slot_overlap(
     auditorium_uuid: UUID4,
     day_of_week: int,
@@ -60,6 +64,7 @@ async def check_availability_slot_overlap(
     return True
 
 
+@log_calls
 async def create_availability(availability_model: CreateAvailability) -> AvailabilitySlot:
     auditorium = await Auditorium.get_or_none(uuid=availability_model.auditorium)
     if not auditorium:
@@ -81,19 +86,25 @@ async def create_availability(availability_model: CreateAvailability) -> Availab
     )
     await availability.save()
     await availability.fetch_related('auditorium')
+
+    metrics.backend_availability_slots_managed_total.labels(operation="create").inc()
+
     return availability
 
 
+@log_calls
 async def get_availability(uuid: UUID4) -> Optional[AvailabilitySlot]: 
     availability = await AvailabilitySlot.get_or_none(uuid=uuid)
     return availability
 
 
+@log_calls
 async def get_all_availabilities() -> List[AvailabilitySlot]: 
     availabilities = await AvailabilitySlot.all()
     return availabilities
 
 
+@log_calls
 async def update_availability( 
     availability_uuid: UUID4,
     availability_update_data: UpdateAvailability
@@ -117,11 +128,17 @@ async def update_availability(
     )
 
     await availability.update_from_dict(update_data).save() 
+
+    metrics.backend_availability_slots_managed_total.labels(operation="update").inc()
+
     return availability
 
 
+@log_calls
 async def delete_availability(availability_uuid: UUID4) -> None:
     availability = await AvailabilitySlot.get_or_none(uuid=availability_uuid)
     if not availability:
         raise HTTPException(status_code=404, detail="Availability slot not found")
     await availability.delete()
+
+    metrics.backend_availability_slots_managed_total.labels(operation="delete").inc()

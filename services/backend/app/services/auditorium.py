@@ -1,11 +1,14 @@
 from typing import List, Optional
 from fastapi import HTTPException, Depends
+from pydantic import UUID4
 
 from app.schemas import CreateAuditorium, UpdateAuditorium, DeleteAuditorium
 from app.models import Auditorium, Equipment
-from pydantic import UUID4
+from app.logger import log_calls
 
+from app import metrics
 
+@log_calls
 async def _get_equipment_objects(equipment_uuids: Optional[List[UUID4]]) -> List[Equipment]:
     """Вспомогательная функция для получения объектов Equipment по UUID."""
     equipment_objects = []
@@ -21,6 +24,7 @@ async def _get_equipment_objects(equipment_uuids: Optional[List[UUID4]]) -> List
     return equipment_objects
 
 
+@log_calls
 async def create_auditorium(auditorium_model: CreateAuditorium) -> Auditorium:
     existing = await Auditorium.get_or_none(identifier=auditorium_model.identifier)
     if existing:
@@ -41,9 +45,13 @@ async def create_auditorium(auditorium_model: CreateAuditorium) -> Auditorium:
     if equipment_to_add:
         await auditorium.equipment.add(*equipment_to_add)
     await auditorium.fetch_related('equipment') 
+
+    metrics.backend_auditoriums_managed_total.labels(operation="create").inc()
+
     return auditorium
 
 
+@log_calls
 async def update_auditorium(auditorium_uuid: UUID4, auditorium_update_data: UpdateAuditorium) -> Auditorium:
     auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
     if not auditorium:
@@ -61,16 +69,23 @@ async def update_auditorium(auditorium_uuid: UUID4, auditorium_update_data: Upda
 
     await auditorium.update_from_dict(update_data).save()
     await auditorium.fetch_related('equipment')
+
+    metrics.backend_auditoriums_managed_total.labels(operation="update").inc()
+
     return auditorium
 
 
+@log_calls
 async def delete_auditorium(auditorium_uuid: UUID4):
     auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
     if not auditorium:
         raise HTTPException(status_code=404, detail="Auditorium not found")
     await auditorium.delete()
 
+    metrics.backend_auditoriums_managed_total.labels(operation="delete").inc()
 
+
+@log_calls
 async def get_auditorium_by_uuid(auditorium_uuid: UUID4) -> Optional[Auditorium]:
     auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
     if auditorium:
@@ -78,6 +93,7 @@ async def get_auditorium_by_uuid(auditorium_uuid: UUID4) -> Optional[Auditorium]
     return auditorium
 
 
+@log_calls
 async def get_auditoriums(
     min_capacity: Optional[int] = None,
     equipment_id: Optional[UUID4] = None
