@@ -163,6 +163,67 @@ class AvailabilitySlot(BaseModel):
         except DoesNotExist:
             return None
 
+    @classmethod
+    # def format_availability_slot(cls, slot_data):
+    #     """
+    #     Форматирует одну строку данных о доступности слота в читаемый вид.
+    #
+    #     Args:
+    #         slot_data: Строка с данными о доступности слота (например,
+    #                    'Aud. a230911f-627a-412c-b305-dab0a53b87b1: Mon 09:00:00+00:00-18:00:00+00:00').
+    #
+    #     Returns:
+    #         Строка с отформатированными данными о слоте, или сообщение об ошибке,
+    #         если данные неверного формата.
+    #     """
+    #
+    #     if not slot_data:
+    #         return "Нет данных для форматирования."
+    #
+    #     try:
+    #         parts = slot_data.split(':')
+    #         if len(parts) < 2:
+    #             return "Неверный формат данных (отсутствует разделитель ':')."
+    #
+    #         auditorium_id = parts[0].strip()
+    #         day_time_info = parts[1].strip()
+    #
+    #         if not day_time_info:
+    #             return "Нет информации о дне и времени."
+    #
+    #         parts_day_time = day_time_info.split()
+    #         if len(parts_day_time) < 2:
+    #             return f"Неполная информация о дне/времени: {day_time_info} (отсутствует день или время)."
+    #
+    #         day_mapping = {
+    #             "Mon": "Понедельник",
+    #             "Tue": "Вторник",
+    #             "Wed": "Среда",
+    #             "Thu": "Четверг",
+    #             "Fri": "Пятница",
+    #             "Sat": "Суббота",
+    #             "Sun": "Воскресенье"
+    #         }
+    #
+    #         day_abbr = parts_day_time[0]
+    #         time_range = parts_day_time[1]
+    #
+    #         if "-" not in time_range:
+    #             return f"Неверный формат временного интервала: {time_range} (отсутствует разделитель '-')."
+    #
+    #         time_range = time_range + "-17:00:00+00:00"
+    #         start_time, end_time = time_range.split('-')
+    #         start_time = start_time[:5]  # Обрезаем до часов и минут
+    #         end_time = end_time[:5]  # Обрезаем до часов и минут
+    #
+    #         day_name = day_mapping.get(day_abbr, day_abbr)  # Получаем полное название дня
+    #
+    #         return f"{day_name}: {start_time} - {end_time}"  # Убрали ID аудитории
+    #
+    #     except Exception as e:
+    #         return f"Ошибка при обработке данных: {e}"
+
+
     #TODO Сделать форматирование  вывода
 
     class Meta:

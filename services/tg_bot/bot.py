@@ -1,3 +1,4 @@
+from ftplib import all_errors
 from os import getenv
 from typing import List
 
@@ -13,6 +14,8 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message
+from pyexpat.errors import messages
+
 import keyboards
 import values
 # import app.db
@@ -56,7 +59,6 @@ class watch_cab(StatesGroup):
 @dp.message(F.text == values.but_watch_schedule)
 async def watch_schedule(message: Message, state: FSMContext):
     await message.answer(f"Введите номер аудитории который хотите посмотреть\n")
-    #TODO просмотр расписания всех аудиторий
     await state.set_state(watch_cab.input_cab)
 
 class StateInline(StatesGroup):
@@ -79,11 +81,9 @@ async def process_callback(message: Message, aud_names: List):
 
 @dp.callback_query(F.data.startswith('page_'))
 async def page_callback_handler(query: types.CallbackQuery, state: FSMContext ):
-    """Обработчик нажатий на кнопки страниц (стрелки)."""
     page_num = int(query.data.split('_')[1])
     data = await state.get_data()
     aud_names = data.get("all_items")
-    # await message.answer(f'ENTRY CALLBACK!')
     keyboard = keyboards.create_keyboard(page_num, aud_names)
     content = f'В данный момент доступно {len(aud_names)} аудиторий, выберите нужную'
     await query.message.edit_text(text=content, reply_markup=keyboard)
@@ -110,9 +110,12 @@ async def certain_aud(callback_query: types.CallbackQuery, state: FSMContext):
     aud_time = await get_availability_slots_for_auditorium(res_aud.identifier)
     text = []
     for slot in aud_time:
-        text.append(models.AvailabilitySlot.format_data(slot.__str__()))
+        # text.append(models.AvailabilitySlot.format_availability_slot(slot.__str__()))
+        text.append(slot.__str__())
+    await state.update_data(all_items=text)
     await callback_query.message.answer(f'{text}', parse_mode=ParseMode.HTML)
     await state.clear()
+    await callback_query.answer()
 
 
 
@@ -138,6 +141,7 @@ async def filter_cab(message: Message, state: FSMContext):
 async def chosen_capacity(callback_query: types.CallbackQuery, state: FSMContext):
     await callback_query.message.answer(f"Введите количество мест в аудитории")
     await state.set_state(filter_cab_state.print_filtered_cab_capacity)
+    await callback_query.answer()
 
 
 @dp.message(filter_cab_state.print_filtered_cab_capacity)
@@ -145,14 +149,12 @@ async def print_filtered_cab_capacity(message: Message, state: FSMContext):
     capacity = int(message.text)
 
     auditoriums = await models.Auditorium.filter(capacity=capacity).all()
+    aud_names = [aud.identifier for aud in auditoriums]
+    await state.update_data(all_items=aud_names)
     if auditoriums:
-        response = f"Аудитории с вместимостью {capacity}:\n"
-        for auditorium in auditoriums:
-            response += f"- {auditorium.identifier} (UUID: {auditorium.uuid})\n"
-        await message.answer(response)
+        await process_callback(message,  aud_names)
     else:
         await message.answer(f"Аудитории с вместимостью {capacity} не найдены.")
-    await state.clear()
 
 
 
@@ -165,26 +167,11 @@ async def chosen_equipment(callback_query: types.CallbackQuery, state: FSMContex
 @dp.message(filter_cab_state.print_filtered_cab_equip)
 async def input_filter_cab(message: Message, state: FSMContext):
     filter = message.text
-    await message.answer(f'Entry func')
-    equip_id = await models.Equipment.get_by_name(filter)
-    await message.answer(f'your equip = {filter}, equip_id = {equip_id}')
-
-
-    # await state.update_data(filter)
-    # filtered_cab = await models.Equipment.get_by_name(filter)
-    #
-    # if not filtered_cab:
-    #     await message.answer(f"No schedules found containing '{filter}'.")
-    #     await state.clear()
-    #     return
-    # else:
-    #     message.answer(f"ITEM FOUND!!!")
-    # schedule_text = f"Schedules containing '{filter}':\n"
-    # for item in filtered_cab:
-    #     schedule_text += f"- {item.date}: {item.time}: {item.subject} (Room: {item.classroom_number})\n"
-    #
-    # await message.answer(schedule_text)
-    # await state.clear()
+    equipment = await models.Equipment.get_by_name(filter)
+    auditoriums = await models.Auditorium.filter(equipment=equipment).all()
+    aud_names = [aud.identifier for aud in auditoriums]
+    await state.update_data(all_items=aud_names)
+    await process_callback(message, aud_names)
 
 """ Button Просмотр по фильтрам"""
 
