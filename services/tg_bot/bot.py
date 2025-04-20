@@ -87,7 +87,7 @@ async def page_callback_handler(query: types.CallbackQuery, state: FSMContext ):
     keyboard = keyboards.create_keyboard(page_num, aud_names)
     content = f'В данный момент доступно {len(aud_names)} аудиторий, выберите нужную'
     await query.message.edit_text(text=content, reply_markup=keyboard)
-    await query.answer()  # Обязательно нужно ответить на callback запрос
+    await query.answer()
 
 
 async def get_availability_slots_for_auditorium(identifier: str):
@@ -100,7 +100,7 @@ async def get_availability_slots_for_auditorium(identifier: str):
         print(f"Ошибка при получении слотов: {e}")
         return []
 
-@dp.callback_query(F.data.startswith('item_')) #, watch_cab.input_certain_cab
+@dp.callback_query(F.data.startswith('item_'))
 async def certain_aud(callback_query: types.CallbackQuery, state: FSMContext):
     data = callback_query.data.split("_")
     audience_number = data[1]
