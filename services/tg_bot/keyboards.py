@@ -16,7 +16,6 @@ def create_start_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-
 # def create_inline_keyboard_diff_len(count: int) -> InlineKeyboardMarkup:
 #     # count = количество похожих аудиторий в бд
 #     keyboard_buttons = []

@@ -47,7 +47,7 @@ async def command_start_handler(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(f"Привет {message.from_user.full_name}!\n"
                          f"Добро пожаловать в нашего бота бронирования аудиторий",
-                         reply_markup=keyboards.create_start_keyboard().one_time_keyboard,
+                         reply_markup=keyboards.create_start_keyboard(),
                          parse_mode=ParseMode.HTML)
 
 """ Button Просмотр расписания определенной аудитории"""
@@ -92,13 +92,15 @@ async def page_callback_handler(query: types.CallbackQuery, state: FSMContext ):
 
 async def get_availability_slots_for_auditorium(identifier: str):
     try:
+        logging.info(f"\n\n\n ident = {identifier}\n\n")
         auditorium = await models.Auditorium.get(identifier=identifier)
-        # 2. Получаем все связанные слоты доступности
+        logging.info(f"\n\n\n audiot = {auditorium}\n\n")
+
         availability_slots = await models.AvailabilitySlot.filter(auditorium=auditorium).order_by("day_of_week", "start_time")
+        logging.info(f'\n\n\n\ slotss = {availability_slots}\n\n')
         return availability_slots
     except Exception as e:
-        print(f"Ошибка при получении слотов: {e}")
-        return []
+        logging.error(f"\n\n\nОшибка при получении слотов: {e}\n\n\n")
 
 @dp.callback_query(F.data.startswith('item_'))
 async def certain_aud(callback_query: types.CallbackQuery, state: FSMContext):
@@ -107,19 +109,21 @@ async def certain_aud(callback_query: types.CallbackQuery, state: FSMContext):
     await callback_query.message.answer(text=f"Вы выбрали {audience_number}",
                                         reply_markup=keyboards.create_start_keyboard())
     res_aud = await models.Auditorium.get_by_name(audience_number)
+    logging.info(f"!!!{res_aud}")
     aud_time = await get_availability_slots_for_auditorium(res_aud.identifier)
     text = []
+
+    logging.info(f"{aud_time}")
+
     for slot in aud_time:
         # text.append(models.AvailabilitySlot.format_availability_slot(slot.__str__()))
+        # text.append((slot.start_time, slot.end_time, slot.day_of_week))
         text.append(slot.__str__())
+        # logging.INFO(f'!!! okak = {(slot.start_time, slot.end_time, slot.day_of_week)}')
     await state.update_data(all_items=text)
     await callback_query.message.answer(f'{text}', parse_mode=ParseMode.HTML)
     await state.clear()
     await callback_query.answer()
-
-
-
-
 """ Button Просмотр расписания определенной аудитории"""
 
 
@@ -155,9 +159,6 @@ async def print_filtered_cab_capacity(message: Message, state: FSMContext):
         await process_callback(message,  aud_names)
     else:
         await message.answer(f"Аудитории с вместимостью {capacity} не найдены.")
-
-
-
 
 @dp.callback_query(F.data.startswith("filter_equipment"))
 async def chosen_equipment(callback_query: types.CallbackQuery, state: FSMContext):
