@@ -6,6 +6,7 @@ from app.schemas import CreateAuditorium, UpdateAuditorium, DeleteAuditorium
 from app.models import Auditorium, Equipment
 from app.logger import log_calls
 
+from app import metrics
 
 @log_calls
 async def _get_equipment_objects(equipment_uuids: Optional[List[UUID4]]) -> List[Equipment]:
@@ -44,6 +45,9 @@ async def create_auditorium(auditorium_model: CreateAuditorium) -> Auditorium:
     if equipment_to_add:
         await auditorium.equipment.add(*equipment_to_add)
     await auditorium.fetch_related('equipment') 
+
+    metrics.backend_auditoriums_managed_total.labels(operation="create").inc()
+
     return auditorium
 
 
@@ -65,6 +69,9 @@ async def update_auditorium(auditorium_uuid: UUID4, auditorium_update_data: Upda
 
     await auditorium.update_from_dict(update_data).save()
     await auditorium.fetch_related('equipment')
+
+    metrics.backend_auditoriums_managed_total.labels(operation="update").inc()
+
     return auditorium
 
 
@@ -74,6 +81,8 @@ async def delete_auditorium(auditorium_uuid: UUID4):
     if not auditorium:
         raise HTTPException(status_code=404, detail="Auditorium not found")
     await auditorium.delete()
+
+    metrics.backend_auditoriums_managed_total.labels(operation="delete").inc()
 
 
 @log_calls

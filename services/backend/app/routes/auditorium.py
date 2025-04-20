@@ -10,6 +10,8 @@ from app.services.auditorium import get_auditorium_by_uuid, get_auditoriums, cre
 from app.services.booking import get_bookings_for_calendar
 from app.models import User
 
+from app import metrics
+
 router = APIRouter()
 
 CurrentModerator = Depends(get_current_moderator)
@@ -26,6 +28,7 @@ async def route_create_auditorium(
 async def route_get_auditorium(
     auditorium_uuid: UUID4 = Path(..., title="UUID of the auditorium"),
 ):
+    metrics.backend_auditorium_searches_total.labels(filtered_by="none").inc()
     auditorium = await get_auditorium_by_uuid(auditorium_uuid)
     if not auditorium:
         raise HTTPException(status_code=404, detail="Auditorium not found")
@@ -74,7 +77,7 @@ async def route_get_auditorium_calendar(
 
     if start_date > end_date:
         raise HTTPException(status_code=400, detail="Дата начала не может быть позже даты окончания.")
-
+    metrics.backend_calendar_views_total.inc()
     bookings = await get_bookings_for_calendar(
         auditorium_uuid=auditorium_uuid,
         start_date=start_date,
@@ -110,6 +113,17 @@ async def route_get_auditoriums(
     и наличию конкретного оборудования (equipmentId).
     Доступно всем.
     """
+
+    filter_label = "none"
+    if min_capacity is not None and equipment_id is not None:
+        filter_label = "both"
+    elif min_capacity is not None:
+        filter_label = "capacity"
+    elif equipment_id is not None:
+        filter_label = "equipment"
+
+    metrics.backend_auditorium_searches_total.labels(filtered_by=filter_label).inc()
+
     auditoriums = await get_auditoriums(
         min_capacity=min_capacity,
         equipment_id=equipment_id

@@ -16,3 +16,4 @@ pytest
 pytest_asyncio
 faker
 prometheus-fastapi-instrumentator>=6.1.0
+prometheus-client

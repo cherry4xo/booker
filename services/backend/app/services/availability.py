@@ -8,6 +8,8 @@ from app.schemas import CreateAvailability, GetAvailability, UpdateAvailability,
 from app.models import Auditorium, AvailabilitySlot
 from app.logger import log_calls
 
+from app import metrics
+
 
 @log_calls
 async def check_availability_slot_overlap(
@@ -84,6 +86,9 @@ async def create_availability(availability_model: CreateAvailability) -> Availab
     )
     await availability.save()
     await availability.fetch_related('auditorium')
+
+    metrics.backend_availability_slots_managed_total.labels(operation="create").inc()
+
     return availability
 
 
@@ -123,6 +128,9 @@ async def update_availability(
     )
 
     await availability.update_from_dict(update_data).save() 
+
+    metrics.backend_availability_slots_managed_total.labels(operation="update").inc()
+
     return availability
 
 
@@ -132,3 +140,5 @@ async def delete_availability(availability_uuid: UUID4) -> None:
     if not availability:
         raise HTTPException(status_code=404, detail="Availability slot not found")
     await availability.delete()
+
+    metrics.backend_availability_slots_managed_total.labels(operation="delete").inc()

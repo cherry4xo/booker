@@ -11,6 +11,8 @@ from app.models import Auditorium, AvailabilitySlot, User, Booking
 from app.enums import UserRole
 from app.logger import log_calls
 
+from app import metrics
+
 
 @log_calls
 async def check_auditorium_availability(
@@ -45,6 +47,7 @@ async def check_auditorium_availability(
             slots_for_day = availability_slots_cache[day_of_week]
 
         if not slots_for_day:
+            metrics.backend_bookings_creation_failures_total.labels(reason="unavailable").inc()
             raise HTTPException(
                 status_code=400,
                 detail=(f"Аудитория недоступна в указанный интервал. "
@@ -74,6 +77,9 @@ async def check_auditorium_availability(
         if not segment_fully_covered:
             auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
             identifier = auditorium.identifier if auditorium else str(auditorium_uuid)
+
+            metrics.backend_bookings_creation_failures_total.labels(reason="unavailable").inc()
+
             raise HTTPException(
                 status_code=400,
                 detail=(f"Аудитория '{identifier}' недоступна в запрошенный временной интервал. "
@@ -127,6 +133,9 @@ async def check_booking_overlap(
     if overlapping_booking_exists:
         auditorium = await Auditorium.get_or_none(uuid=auditorium_uuid)
         identifier = auditorium.identifier if auditorium else str(auditorium_uuid)
+
+        metrics.backend_bookings_creation_failures_total.labels(reason="overlap").inc()
+
         raise HTTPException(
             status_code=409,
             detail=f"Запрошенный временной слот для аудитории '{identifier}' конфликтует с существующим бронированием."
@@ -139,6 +148,7 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Bo
     """ Создает новое бронирование """
     auditorium = await Auditorium.get_or_none(uuid=booking_model.auditorium)
     if not auditorium:
+        metrics.backend_bookings_creation_failures_total.labels(reason="not_found").inc()
         raise HTTPException(
             status_code=404,
             detail=f"Аудитория с UUID {booking_model.auditorium} не найдена."
@@ -160,13 +170,18 @@ async def create_booking(booking_model: CreateBooking, current_user: User) -> Bo
         )
         await new_booking.save()
         await new_booking.fetch_related('broker', 'auditorium')
+
+        metrics.backend_bookings_created_total.inc()
+
         return new_booking
     except IntegrityError as e:
+        metrics.backend_bookings_creation_failures_total.labels(reason="other").inc()
         raise HTTPException(
             status_code=409,
             detail=f"Ошибка целостности данных при создании бронирования: {e}"
         )
     except Exception as e:
+        metrics.backend_bookings_creation_failures_total.labels(reason="other").inc()
         print(f"Unexpected error creating booking: {e}")
         raise HTTPException(
             status_code=500,
@@ -227,6 +242,9 @@ async def update_booking(
     await booking.update_from_dict(update_data).save()
 
     await booking.fetch_related('broker', 'auditorium')
+
+    metrics.backend_bookings_updated_total.inc()
+
     return booking
 
 
@@ -273,6 +291,9 @@ async def delete_booking(booking_uuid: UUID4, current_user: User) -> bool:
         raise HTTPException(status_code=403, detail="Недостаточно прав для удаления этого бронирования.")
     try:
         await booking.delete()
+
+        metrics.backend_bookings_cancelled_total.inc()
+
         return True
     except Exception as e:
          print(f"Error deleting booking {booking_uuid}: {e}")
